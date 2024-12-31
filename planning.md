@@ -10,6 +10,13 @@ Also because I need a quick way to transfer files between my VMs and I don't tru
 * CLI interface & Web interface
 * Temporary file storage - eventually, files will get deleted
 
+## Language Decision
+Using `Node.js` because it does like 3 things at once for me <br>
+God I love this language <br>
+1. Standalone Client-Side executables
+2. Decent Crypto support
+3. Literally designed to build TCP Protocols and Web Servers
+
 ## Main Site Upload
 * File upload
 * 100mb max limit. If something's over 100mb, you probably shouldn't be sending it online   ---> Max 5 min
@@ -142,3 +149,4 @@ Also because I need a quick way to transfer files between my VMs and I don't tru
 * Private key rotation daemon on server
 * 🚨 Lowkey thinking of just flat out not giving users permission to upload a file without a password because c'mon dude at that point why even bother 
 * 2FA? Lowkey this is probably overkill
+* Node.js stand alone executables
