@@ -53,6 +53,19 @@ God I love this language <br>
 * HTTPS Private Key != Actual private key used to encrypt/sign
 * Second thought: Azure Key Vault but that'll require us trusting Azure (also it costs a bit more $$$ but it is an option)
 
+## More on Symmetric Encryption + Key Generation
+* Intrusive thought: Can't we just add a random timer to prevent side channel attacks
+* Allow users to put in authentication codes (basically they serve to generate a MAC). If they don't, we'll use a different Key-Derivation function to generate an HMAC key
+    * If one of the keys get compromised, the master key is still safe because of Key Derivation function
+* SALT and IV can be transmitted with encrypted data (or included in the URL). Their job is to introduce randomness (and not act as a second authentication factor)
+
+## Supported Ciphers
+Huge shoutout to `https://soatok.blog/2020/05/13/why-aes-gcm-sucks/` and `https://soatok.blog/2020/07/12/comparison-of-symmetric-encryption-methods/#aes-gcm-vs-chacha20poly1305`
+* `chacha20-poly1305` - This server is probably not running with Hardware Acceleration, so a built-in MAC + constant time processing is good
+    * Also won't leak all your information, just sayin'
+* `aes-256-gcm` - Authenticated AES-256. If you fundamentally distrust `HMAC + AES256-CBC` because a user can theoretically reuse keys, GCM is an option
+* `aes-256-cbc` -  Doesn't completely flop if we accidentally reuse IVs unlike <a href="https://medium.com/asecuritysite-when-bob-met-alice/why-is-aes-gcm-good-and-not-so-good-for-cybersecurity-28b583bbbbd3">whatever's going on in GCM with GHashes</a> + Industry standard. We already use a CBC MAC for this so 🤷‍♂️
+
 ## Database
 * Stores: URLCode, filePath, Hash of PwdHash/PubKey, expireTime, burnOnRead, HMAC-Entries
 * Sort by expireTime
@@ -71,7 +84,10 @@ God I love this language <br>
         * Edit: Apparently we're worrying too much abt this because "Sanitize User input with a library" is apparently much better than what 75% of the companies out there do
 
 ## Encrypted files
-* [HMAC].[File Content]
+* The sent file can be in any format the user desires
+    * Although the default CLI command will use a HMAC for symmetric key
+    * For asymmetric encryption, the hash will be a DSA (check `Node:Crypto` to see what they support)
+* Serverside: [HMAC / DSA].[Encrypted File Content]
 * Encrypt the already encrypted file again! Use the password hash or public key. 
 * This means if a dummy user decides to not upload an encrypted file or not give us an actual password hash, they still benefit from good ol' security
 * And if they do, tada! End to end 😎
