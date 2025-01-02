@@ -55,7 +55,7 @@ God I love this language <br>
 
 ## More on Symmetric Encryption + Key Generation
 * Intrusive thought: Can't we just add a random timer to prevent side channel attacks
-* Allow users to put in authentication codes (basically they serve to generate a MAC). If they don't, we'll use a different Key-Derivation function to generate an HMAC key
+* Allow users to put in authentication codes (basically they serve to generate a MAC). If they don't, we'll use a different SALT to generate an HMAC key
     * If one of the keys get compromised, the master key is still safe because of Key Derivation function
 * SALT and IV can be transmitted with encrypted data (or included in the URL). Their job is to introduce randomness (and not act as a second authentication factor)
 
@@ -64,7 +64,16 @@ Huge shoutout to `https://soatok.blog/2020/05/13/why-aes-gcm-sucks/` and `https:
 * `chacha20-poly1305` - This server is probably not running with Hardware Acceleration, so a built-in MAC + constant time processing is good
     * Also won't leak all your information, just sayin'
 * `aes-256-gcm` - Authenticated AES-256. If you fundamentally distrust `HMAC + AES256-CBC` because a user can theoretically reuse keys, GCM is an option
+    * Use longer nonces since ours is randomly generated: https://crypto.stackexchange.com/questions/41601/aes-gcm-recommended-iv-size-why-12-bytes
 * `aes-256-cbc` -  Doesn't completely flop if we accidentally reuse IVs unlike <a href="https://medium.com/asecuritysite-when-bob-met-alice/why-is-aes-gcm-good-and-not-so-good-for-cybersecurity-28b583bbbbd3">whatever's going on in GCM with GHashes</a> + Industry standard. We already use a CBC MAC for this so 🤷‍♂️
+<br>
+
+For hashes, we'll use `sha3-512`. `sha2` is probably secure enough, but I had to stick with one thing and `sha3` isn't vulnerable to side channel analysis and maybe some length extension attacks.
+
+## KDFs ✅
+* The biggest vulnerability I can see happening with the KDFs is someone just brute forcing all the possible master keys with our given (and quite public) SALT to try and recover them
+* `Node.js` doesn't have `argon2` but it does have `scrypt` which is more resistant against brute force attacks w/ support from hardware and those AI/ML GPUs 🤔 
+* TLDR - We're using `scrypt` 
 
 ## Database
 * Stores: URLCode, filePath, Hash of PwdHash/PubKey, expireTime, burnOnRead, HMAC-Entries
