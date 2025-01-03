@@ -45,7 +45,7 @@ God I love this language <br>
 * --> if an attacker can get access to the private key stored in some privileged 
 * Zero out the memory if possible bc memory forensics is scary (tbf if they get this far we're already cooked but still confidentiality >>> here)
 
-## Private Key Encryption
+## Private Key Signing/Encryption serverside
 * Do not give FtYeet permission to private key file (`chmod` such that `FtYeet` doesn't have perms to view this at all)
 * Create a new privileged user with access to private key file
 * User will serve as key vault (encrypt, decrypt, sign, etc.)
@@ -58,6 +58,12 @@ God I love this language <br>
 * Allow users to put in authentication codes (basically they serve to generate a MAC). If they don't, we'll use a different SALT to generate an HMAC key
     * If one of the keys get compromised, the master key is still safe because of Key Derivation function
 * SALT and IV can be transmitted with encrypted data (or included in the URL). Their job is to introduce randomness (and not act as a second authentication factor)
+
+## More on Asymmetric Encryption
+* In case I forget, sign w/ your private key & encrypt with their public key.
+* The user should have the other person's public key. That also acts as authentication lowkey
+* For passwords: Store person A's public key. Still encrypt with person A's public key
+* For sending/authenticating: Store person B's public key. Challenge them with that. A's stuff can be done clientside
 
 ## Supported Ciphers
 Huge shoutout to `https://soatok.blog/2020/05/13/why-aes-gcm-sucks/` and `https://soatok.blog/2020/07/12/comparison-of-symmetric-encryption-methods/#aes-gcm-vs-chacha20poly1305`

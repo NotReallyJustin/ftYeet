@@ -12,12 +12,14 @@ const {
     verify,
     getCiphers,
     getHashes,
+    generateKeyPairSync,
     scryptSync,
     createCipheriv,
-    createDecipheriv
+    createDecipheriv,
+    constants
 } = await import('node:crypto');
 
-export { supportedCiphers, secureKeyGen, zeroBuffer }
+export { supportedCiphers, supportedAsymmetrics, secureKeyGen, zeroBuffer }
 
 /**
  * List of supported Ciphers. See `planning.md` if you're curious.
@@ -27,6 +29,17 @@ const supportedCiphers = [
     'chacha20-poly1305',
     'aes-256-gcm',
     'aes-256-cbc'
+]
+
+/**
+ * List of supported algorithms for asymmetric key generation.
+ * These could be for encryption, signing, or key exchange.
+ */
+const supportedAsymmetrics = [
+    'rsa',
+    'dsa',
+    'ed25519',
+    'x25519'
 ]
 
 /**
@@ -173,8 +186,8 @@ const symmetricDecrypt = (password, hmacPassword, ciphertext, decryptAlg, crypto
     }
     catch(err)
     {
-        throw "Invalid AuthTag for ciphertext. Your ciphertext might have been tampered with. Aborting decryption now...."
-        // throw err;
+        //throw "Invalid AuthTag for ciphertext. Your ciphertext might have been tampered with. Aborting decryption now...."
+        throw err;
     }
 
     let plaintext = Buffer.concat([decBuffer1, decBuffer2]);
@@ -186,9 +199,172 @@ const symmetricDecrypt = (password, hmacPassword, ciphertext, decryptAlg, crypto
     return plaintext;
 }
 
+/**
+ * Compatible Public Key encoding for `genKeyPair`
+ */
+const compatPubKE = {
+    type: 'spki',
+    format: 'pem'
+}
+
+/**
+ * Compatible Private Key encoding for `genKeyPair`
+ */
+const compatPrivKE = {
+    type: 'pkcs8',
+    format: 'pem'
+}
+
+/**
+ * Generates a keypair for asymmetric encryption. Wrapper for Node function.
+ * @param {String} encryptAlg Asymmetric encryption algorithm. Must be in the list of supportedAsymmetrics
+ * @param {JSON} options Node.js options for your asymmetric encryption alg
+ * @param {String} options.publicKeyEncoding Encoding for public key. We recommend using compatPubKE for max compatibility
+ * @param {String} options.privateKeyEncoding Encoding for private key. We recommend using compatPrivKE for max compatibility
+ * @see https://nodejs.org/api/crypto.html#cryptogeneratekeypairsynctype-options
+ * @returns {{publicKey: String, privateKey: String}} JSON of public and private key in the format specified by `publicKeyEncoding` and `privateKeyEncoding` (strings for `compat*KE`)
+ */
+const genKeyPair = (encryptAlg, options) => {
+
+    if (!supportedAsymmetrics.includes(encryptAlg))
+    {
+        throw "Unsupported algorithm. Check `supportedAsymmetrics` in `crypto_util.js` for a list.";
+    }
+
+    if (options == undefined)
+    {
+        throw "Please provide key pair generation options.";
+    }
+
+    if (options.publicKeyEncoding == undefined)
+    {
+        throw "Please provide a public key encoding. If you can't figure this out, use `compatPubKE`.";
+    }
+
+    if (options.privateKeyEncoding == undefined)
+    {
+        throw "Please provide a public key encoding. If you can't figure this out, use `compatPrivKE`.";
+    }
+    
+    // If you're using compatPubKE or compatPrivKE, you should have a string here as your return value.
+    let keyPair = generateKeyPairSync(encryptAlg, options);
+    return keyPair;
+}
+
+// RSA public encrypt and decrypt functions not provided because Node's library is better for that (no need to put a wrapper)
+// Note that because of the CLI and because of how the algorithms work, we give users a lot more flexibility when they use asymmetric encryption
+
+/**
+ * Signs the data using the given public/private key.
+ * @param {String|undefined} hashAlg Hashing algorithm. Using undefined will leave this up to Node.js (which may very well use something like SHA-1). Do not give users this option explicitly.
+ * @param {Buffer} data Data to be signed. You are responsible for zeroing this out later down the line if it's sensitive.
+ * @param {{key: String, dsaEncoding: String, padding: Number, passphrase: String}} signKeyObject JSON object with key and other configs (such as padding. Consider using crypto.constants.RSA_PKCS1_PSS_PADDING)
+ * @param {String} signKeyObject.passphrase If your private key is encrypted, provide a passphrase
+ * @param {String} signKeyObject.key Key for digital signature
+ * @see https://nodejs.org/api/crypto.html#cryptosignalgorithm-data-key-callback
+ * @returns {String} Digital signature (in hex)
+ */
+const secureSign = (hashAlg, data, signKeyObject) => {
+
+    if (hashAlg != undefined && !getHashes().includes(hashAlg))
+    {
+        throw "HashAlg is not supported by Node.js. We recommend sha3-512.";
+    }
+
+    if (signKeyObject.key == undefined)
+    {
+        throw "Please provide a key to sign.";
+    }
+
+    if (signKeyObject.key.includes("ENCRYPTED") && signKeyObject.passphrase == undefined)
+    {
+        throw "It seems like your (presumably private) key is encrypted. Please provide a passphrase.";
+    }
+
+    let signature;              // Buffer
+    try
+    {
+        signature = sign(hashAlg, data, signKeyObject);
+    }
+    catch(err)
+    {
+        throw `Error when signing: ${err.toString()}. Usually this occurs because of a wrong passphrase when decrypting the private key.`;
+    }
+
+    let signatureHex = signature.toString('hex');
+    zeroBuffer(signature);
+
+    return signatureHex;
+}
+
+/**
+ * Verifies a digital signature using a private/public key
+ * @param {String|undefined} hashAlg Hashing algorithm. This must be the same as the hashing algorithm used in the digital signature
+ * @param {Buffer} data Data to be verify signature of. You are responsible for zeroing this out later down the line if it's sensitive.
+ * @param {{key: String, dsaEncoding: String, padding: Number, passphrase: String}} verifyKeyObject JSON object with key and other configs (such as padding. Consider using crypto.constants.RSA_PKCS1_PSS_PADDING)
+ * @param {String} verifyKeyObject.passphrase If your private key is encrypted, provide a passphrase
+ * @param {String} verifyKeyObject.key Key for digital signature
+ * @param {String} signature The digital signature (in hex)
+ * @see https://nodejs.org/api/crypto.html#cryptosignalgorithm-data-key-callback
+ * @return {Boolean} Whether or not the digital signature is valid
+ */
+const secureVerify = (hashAlg, data, verifyKeyObject, signature) => {
+    
+    if (hashAlg != undefined && !getHashes().includes(hashAlg))
+    {
+        throw "HashAlg is not supported by Node.js. Check to make sure you are using the same one as the hashing algorithm.";
+    }
+    
+    if (verifyKeyObject.key == undefined)
+    {
+        throw "Please provide a key to sign.";
+    }
+
+    if (verifyKeyObject.key.includes("ENCRYPTED") && verifyKeyObject.passphrase == undefined)
+    {
+        throw "It seems like your key is encrypted. Please provide a passphrase.";
+    }
+
+    let signatureBuffer = Buffer.from(signature, 'hex');        // Buffer
+
+    let signatureValid;
+    try
+    {
+        signatureValid = verify(hashAlg, data, verifyKeyObject, signatureBuffer);
+    }
+    catch(err)
+    {
+        throw `Error when verifying: ${err.toString()}. Usually this occurs because of a wrong passphrase when decrypting the private key.`;
+    }
+    
+    zeroBuffer(signatureBuffer);
+
+    return signatureValid;
+}
+
 // 🛠️ Testing area 
-const encAlg = 'aes-256-gcm'
-let symmEnc = symmetricEncrypt("49ers", "San Francisco", "That's looking Purdy good... except for Moody. He's making me Moody.", encAlg, 12);
-// symmEnc.encAuthTag = 'c3047f19c8588dca270ec3a0719076ff'
-let symmDec = symmetricDecrypt("49ers", "San Francisco", symmEnc.ciphertext, encAlg, symmEnc);
-console.log(symmDec.toString('utf-8'))
+// const encAlg = 'aes-256-gcm'
+// let symmEnc = symmetricEncrypt("49ers", "San Francisco", "That's looking Purdy good... except for Moody. He's making me Moody.", encAlg, 12);
+// // symmEnc.encAuthTag = 'c3047f19c8588dca270ec3a0719076ff'
+// let symmDec = symmetricDecrypt("49ers", "San Francisco", symmEnc.ciphertext, encAlg, symmEnc);
+// console.log(symmDec.toString('utf-8'))
+
+let keyPair = genKeyPair('rsa', {
+    modulusLength: 4096,
+    publicKeyEncoding: compatPubKE,
+    privateKeyEncoding: {
+        type: 'pkcs8',
+        format: 'pem',
+        cipher: 'aes-256-cbc',
+        passphrase: 'CMC'
+    }
+});
+
+let encrypted = publicEncrypt({key: keyPair.publicKey, oaepHash: 'sha3-512', padding: constants.RSA_PKCS1_OAEP_PADDING}, Buffer.from("Touchdown San Francisco!", 'utf-8'));
+let decrypted = privateDecrypt({key: keyPair.privateKey, oaepHash: 'sha3-512', padding: constants.RSA_PKCS1_OAEP_PADDING, passphrase: 'CMC'}, encrypted);
+
+let signature = secureSign('sha3-512', encrypted, {key: keyPair.privateKey, passphrase: 'CMC', padding: constants.RSA_PKCS1_PSS_PADDING});
+let isValid = secureVerify('sha3-512', Buffer.from("hello", "ascii"), {key: keyPair.publicKey, padding: constants.RSA_PKCS1_PSS_PADDING}, signature);
+
+console.dir(decrypted.toString('utf-8'));
+console.dir(isValid);
