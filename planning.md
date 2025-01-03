@@ -17,6 +17,11 @@ God I love this language <br>
 2. Decent Crypto support
 3. Literally designed to build TCP Protocols and Web Servers
 
+## Main Server
+* Host an https one and a net one
+* https can be done via express
+* I'm not going to be able to have backups and stuff on this, and since we're using HTTPS, make this stateless
+
 ## Main Site Upload
 * File upload
 * 100mb max limit. If something's over 100mb, you probably shouldn't be sending it online   ---> Max 5 min

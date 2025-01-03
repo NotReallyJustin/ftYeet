@@ -1,0 +1,15 @@
+{
+  "name": "ftyeet",
+  "version": "1.0.0",
+  "description": "Command Line Interface to interact with ftYeet",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Justin Chen",
+  "license": "GPL-3.0-only",
+  "type": "module",
+  "dependencies": {
+    "commander": "^13.0.0"
+  }
+}

@@ -19,7 +19,7 @@ const {
     constants
 } = await import('node:crypto');
 
-export { supportedCiphers, supportedAsymmetrics, secureKeyGen, zeroBuffer }
+export { supportedCiphers, supportedAsymmetrics, secureKeyGen, zeroBuffer, symmetricDecrypt, symmetricEncrypt, secureSign, secureVerify, compatPrivKE, compatPubKE, genKeyPair }
 
 /**
  * List of supported Ciphers. See `planning.md` if you're curious.
@@ -349,22 +349,23 @@ const secureVerify = (hashAlg, data, verifyKeyObject, signature) => {
 // let symmDec = symmetricDecrypt("49ers", "San Francisco", symmEnc.ciphertext, encAlg, symmEnc);
 // console.log(symmDec.toString('utf-8'))
 
-let keyPair = genKeyPair('rsa', {
-    modulusLength: 4096,
-    publicKeyEncoding: compatPubKE,
-    privateKeyEncoding: {
-        type: 'pkcs8',
-        format: 'pem',
-        cipher: 'aes-256-cbc',
-        passphrase: 'CMC'
-    }
-});
+// 🛠️ DEMO for asymm.
+// let keyPair = genKeyPair('rsa', {
+//     modulusLength: 4096,
+//     publicKeyEncoding: compatPubKE,
+//     privateKeyEncoding: {
+//         type: 'pkcs8',
+//         format: 'pem',
+//         cipher: 'aes-256-cbc',
+//         passphrase: 'CMC'
+//     }
+// });
 
-let encrypted = publicEncrypt({key: keyPair.publicKey, oaepHash: 'sha3-512', padding: constants.RSA_PKCS1_OAEP_PADDING}, Buffer.from("Touchdown San Francisco!", 'utf-8'));
-let decrypted = privateDecrypt({key: keyPair.privateKey, oaepHash: 'sha3-512', padding: constants.RSA_PKCS1_OAEP_PADDING, passphrase: 'CMC'}, encrypted);
+// let encrypted = publicEncrypt({key: keyPair.publicKey, oaepHash: 'sha3-512', padding: constants.RSA_PKCS1_OAEP_PADDING}, Buffer.from("Touchdown San Francisco!", 'utf-8'));
+// let decrypted = privateDecrypt({key: keyPair.privateKey, oaepHash: 'sha3-512', padding: constants.RSA_PKCS1_OAEP_PADDING, passphrase: 'CMC'}, encrypted);
 
-let signature = secureSign('sha3-512', encrypted, {key: keyPair.privateKey, passphrase: 'CMC', padding: constants.RSA_PKCS1_PSS_PADDING});
-let isValid = secureVerify('sha3-512', Buffer.from("hello", "ascii"), {key: keyPair.publicKey, padding: constants.RSA_PKCS1_PSS_PADDING}, signature);
+// let signature = secureSign('sha3-512', encrypted, {key: keyPair.privateKey, passphrase: 'CMC', padding: constants.RSA_PKCS1_PSS_PADDING});
+// let isValid = secureVerify('sha3-512', Buffer.from("hello", "ascii"), {key: keyPair.publicKey, padding: constants.RSA_PKCS1_PSS_PADDING}, signature);
 
-console.dir(decrypted.toString('utf-8'));
-console.dir(isValid);
+// console.dir(decrypted.toString('utf-8'));
+// console.dir(isValid);
