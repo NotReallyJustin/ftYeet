@@ -19,7 +19,8 @@ const {
     constants
 } = await import('node:crypto');
 
-export { supportedCiphers, supportedAsymmetrics, secureKeyGen, zeroBuffer, symmetricDecrypt, symmetricEncrypt, secureSign, secureVerify, compatPrivKE, compatPubKE, genKeyPair }
+export { supportedCiphers, supportedAsymmetrics, secureKeyGen, zeroBuffer, symmetricDecrypt, symmetricEncrypt, secureSign, secureVerify, compatPrivKE, compatPubKE, genKeyPair, 
+    keyEncodingFormats, keyEncodingTypes }
 
 /**
  * List of supported Ciphers. See `planning.md` if you're curious.
@@ -214,6 +215,16 @@ const compatPrivKE = {
     type: 'pkcs8',
     format: 'pem'
 }
+
+/**
+ * List of supported formats to encode keypairs
+ */
+const keyEncodingFormats = ['pem', 'der', 'jwk'];
+
+/**
+ * List of supported types to encode keypairs
+ */
+const keyEncodingTypes = ['pkcs1', 'pkcs8', 'spki'];
 
 /**
  * Generates a keypair for asymmetric encryption. Wrapper for Node function.
