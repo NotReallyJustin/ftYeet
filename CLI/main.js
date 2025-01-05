@@ -10,6 +10,7 @@ program
 
 program
     .command("keygen")
+    .description("Generates a supported asymmetric keypair to use in E2EE")
     .requiredOption('-a, --algorithm <rsa|dsa|ed25519|x25519>', 'asymmetric algorithm to generate keys for')
     .requiredOption('-u, --public-key-path <path>', 'public key file path')
     .requiredOption('-v, --private-key-path <path>', 'private key file path')
@@ -19,9 +20,9 @@ program
     .option('-l, --modulus-length [number]', 'modulus length in bits (required for RSA and DSA)', parseInt, 4096)
     .option('-p, --public-exponent [number]', 'exponent for RSA; defaults to 0x10001', parseInt, 0x1001)
     .option('-d, --divisor-length [number]', 'size of q in bits (for DSA)', parseInt, 256)
-    .option('-c, --named-curve [curve name]', 'Name of the curve to use for EC-based algs (ie. "secp256k1", "prime256v1")')
-    .option('-k, --privatekey-cipher [cipher name]', 'Symmetric cipher to encrypt private key file with. Must be used with -pp')
-    .option('-o, --passphrase [password]', 'Passphrase to encrypt private key file with. Must be used with -pc')
+    .option('-c, --named-curve [curve name]', 'name of the curve to use for EC-based algs (ie. "secp256k1", "prime256v1")')
+    .option('-k, --privatekey-cipher [cipher name]', 'symmetric cipher to encrypt private key file with. Must be used with -o')
+    .option('-o, --passphrase [password]', 'passphrase to encrypt private key file with. Must be used with -k')
     .action((options) => {
         let algorithm = options.algorithm;
         let pubKE = {
@@ -70,5 +71,16 @@ program
         functions.keygen(pubPath, privPath, algorithm, options);
     })
 ;
+
+program
+    .command("upload")
+    .description("Encrypts a local file, runs an HMAC, and uploads it to a ftYeet server")
+    .requiredOption('-p, --password <password>', 'password used to encrypt the file locally; also used for HMACs if -c is empty')
+    .requiredOption('-f, --file <path>', 'path of the file to upload')
+    .option('-a, --algorithm [chacha20-poly1305|aes-256-gcm|aes256-cbc]', 'symmetric algorithm for encrypting the file', 'chacha20-poly1305')
+    .option('-c, --auth-code [password]', 'authentication code used to generate file HMAC; password would be used if this is left empty')
+    .action((options) => {
+        console.dir(options)
+    })
 
 program.parse(process.argv);

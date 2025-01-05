@@ -107,7 +107,10 @@ For hashes, we'll use `sha3-512`. `sha2` is probably secure enough, but I had to
 * The sent file can be in any format the user desires
     * Although the default CLI command will use a HMAC for symmetric key
     * For asymmetric encryption, the hash will be a DSA (check `Node:Crypto` to see what they support)
-* Serverside: [HMAC / DSA].[Encrypted File Content]
+* Serverside: `[0 for Symmetric][HMAC Size : 4 bytes][HMAC cryptosystem : 64 bytes][cryptosystem size : 4 bytes][cryptosystem : up to 2^32 bytes][data]`
+* Serverside Asymmetric: `[1 for Asymmetric][Signature Size : 4 bytes][Signature cryptosystem][cryptosystem size : 4 bytes][cryptosystem : up to 2^32 bytes][data]`
+    * Since each encryption alg is going to have different data, this is the best way to format things
+    * Treat it as a JSON
 * Encrypt the already encrypted file again! Use the password hash or public key. 
 * This means if a dummy user decides to not upload an encrypted file or not give us an actual password hash, they still benefit from good ol' security
 * And if they do, tada! End to end 😎
