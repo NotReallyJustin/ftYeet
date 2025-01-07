@@ -20,7 +20,7 @@ const {
 } = await import('node:crypto');
 
 export { supportedCiphers, supportedAsymmetrics, secureKeyGen, zeroBuffer, symmetricDecrypt, symmetricEncrypt, secureSign, secureVerify, compatPrivKE, compatPubKE, genKeyPair, 
-    keyEncodingFormats, keyEncodingTypes, supportedHashes, genHMAC }
+    keyEncodingFormats, keyEncodingTypes, supportedHashes, genHMAC, fromFileSyntaxAsymm, toFileSyntaxAsymm, fromFileSyntaxSymm, toFileSyntaxSymm, genAsymmCryptosystem }
 
 /**
  * List of supported Ciphers. See `planning.md` if you're curious.
@@ -329,7 +329,7 @@ const secureSign = (hashAlg, data, signKeyObject) => {
     }
     catch(err)
     {
-        throw `Error when signing: ${err.toString()}. Usually this occurs because of a wrong passphrase when decrypting the private key.`;
+        throw `Error when signing: ${err}.\n Usually this occurs because of a wrong passphrase when decrypting the private key.`;
     }
 
     let signatureHex = signature.toString('hex');
@@ -525,17 +525,221 @@ const fromFileSyntaxSymm = (hmacKey, fileBuffer) => {
     };
 }
 
-// 🛠️ Testing area 
-const encAlg = 'aes-256-gcm'
-let symmEnc = symmetricEncrypt("49ers", "San Francisco", "That's looking Purdy good... except for Moody. He's making me Moody.", encAlg, 12);
-// symmEnc.encAuthTag = 'c3047f19c8588dca270ec3a0719076ff'
-// let symmDec = symmetricDecrypt("49ers", "San Francisco", symmEnc.ciphertext, encAlg, symmEnc);
+/**
+ * Creates a JSON cryptosystem for asymmetric encryption to eventually create a file syntax with
+ * In other words, this is a struct for an asymmetric cryptosystem object
+ * @param {String} signature Digital signature, in hex
+ * @param {Number} dsaPadding Padding for the digital signature. Must be Node.js `crypto.constants.RSA_PKCS1_PSS_PADDING` or `crypto.constants.RSA_PKCS1_PADDING`
+ * @param {Number} encryptPadding Padding for asymmetric encryption algorithm. Must be `crypto.constants.RSA_PKCS1_OAEP_PADDING` or `crypto.constants.RSA_PKCS1_PADDING`
+ * @param {String|undefined} oaepHash Mandatory if you use `crypto.constants.RSA_PKCS1_OAEP_PADDING`. Must be part of `supportedHashes`
+ * @returns {{dsaPadding: Number, encryptPadding: Number, oaepHash: String|undefined}} JSON for the asymmetric cryptosystem
+ */
+const genAsymmCryptosystem = (signature, dsaPadding, encryptPadding, oaepHash) => {
+    
+    let cryptosystem = {
+        dsaPadding: dsaPadding,
+        encryptPadding: encryptPadding,             // This function exists less for this JSON part and more for the verification part
+        oaepHash: oaepHash,
+        signature: signature
+    }
 
-let ciphertext = symmEnc.ciphertext;
-delete symmEnc.ciphertext;
-let fileSyntax = toFileSyntaxSymm(symmEnc, ciphertext, secureKeyGen("San Francisco", 32, symmEnc.hmacSalt).key, 'CLI');
-let restored = fromFileSyntaxSymm(secureKeyGen("San Francisco", 32, symmEnc.hmacSalt).key, fileSyntax);
-console.dir(restored);
+    if (!validateAsymmCryptosystem(cryptosystem))
+    {
+        throw "Cryptosystem inputs are invalid.";
+    }
+
+    return cryptosystem;
+}
+
+/**
+ * Validates an asymmetric cryptosystem JSON. Prolly should stay an internal function
+ * @param {{dsaPadding: Number, encryptPadding: Number, oaepHash: String|undefined}} cryptosystem The Asymmetric JSON cryptosystem
+ * @throws Errors if the padding is unsupported, or if oaepHash type is not specified.
+ * @returns {Boolean} Whether the JSON is valid or not
+ */
+const validateAsymmCryptosystem = (cryptosystem) => {
+    
+    if (cryptosystem.signature == undefined)
+    {
+        throw "Cryptosystem is invalid: Must contain signature";
+        return false;
+    }
+
+    if (cryptosystem.dsaPadding != constants.RSA_PKCS1_PSS_PADDING && cryptosystem.dsaPadding != constants.RSA_PKCS1_PADDING)
+    {
+        throw "Cryptosystem is invalid: dsaPadding type is unsupported.";
+        return false;
+    }
+
+    if (cryptosystem.encryptPadding != constants.RSA_PKCS1_OAEP_PADDING && cryptosystem.encryptPadding != constants.RSA_PKCS1_PADDING)
+    {
+        throw "Cryptosystem is invalid: encryptPadding type is unsupported.";
+        return false;
+    }
+
+    if (cryptosystem.encryptPadding == constants.RSA_PKCS1_OAEP_PADDING && cryptosystem.oaepHash == undefined)
+    {
+        throw "Cryptosystem is invalid: Using RSA_PKCS1_OAEP_PADDING but oaepHash is undefined.";
+        return false;
+    }
+
+    if (!supportedHashes.includes(cryptosystem.oaepHash.toLowerCase()))
+    {
+        throw "Cryptosystem is invalid: oaepHash is not supported. Check `supportedHashes` for list of supported hashing algorithms.";
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * Converts a JSON cryptosystem and its associated data into a standardized format you can write to a file.
+ * This is for asymmetric encryption. Use `toFileSyntaxSymm` is this is for a symmetric algorithm.
+* This will digitally sign the dsaPadding, encryptPadding, and oaepHash JSON using the given key, SHA3-512, der encoding, and constants.RSA_PKCS1_PSS_PADDING
+ * The standardized format is `[1 for Asymmetric][Signature Size : 4 bytes][Signature cryptosystem][cryptosystem size : 4 bytes][cryptosystem : up to 2^32 bytes][data]`
+ * @param {{dsaPadding: Number, encryptPadding: Number, oaepHash: String|undefined}} cryptosystem JSON of asymmetric cryptosystem
+ * @param {Buffer} data (Encrypted) data to write to the file
+ * @param {{key: String, dsaEncoding: String, padding: Number, passphrase: String}} dsaKey JSON object with key and password. Encoding is forcibly set to `der` and padding is set to `RSA_PKCS1_PSS_PADDING`.
+ * @param {String} source The platform that encrypted the data. Either `CLI`, `Server`, or `Web`. Used for compatiability purposes
+ * @throws Error cryptosystem is improperly formatted
+ * @throws Error if source is not `CLI`, `Server`, or `Web`
+ * @returns {Buffer} A standardized buffer you can write to files
+ */
+const toFileSyntaxAsymm = (cryptosystem, data, dsaKey, source) => {
+
+    // Error checks
+    if (!validateAsymmCryptosystem(cryptosystem))
+    {
+        throw "Failed to convert to file syntax: Invalid cryptosystem JSON.";
+    }
+    if (!["CLI", "Server", "Web"].includes(source))
+    {
+        throw "Failed to convert to file syntax: Source parameter must contain `CLI`, `Server`, or `Web`."
+    }
+
+    cryptosystem.source = source;
+
+    // Convert cryptosystem to JSON
+    let cryptosysBuffer = Buffer.from(JSON.stringify(cryptosystem));
+
+    // Take care of [cryptosystem size : 4 bytes]
+    let cryptoSize = cryptosysBuffer.length;
+    if (cryptoSize > 3000)
+    {
+        throw "Failed to convert to file syntax: I don't know what you're doing but your cryptosystem JSON should not be > 3,000 bytes. Something went wrong.";
+    }
+
+    let crytoSizeBuffer = Buffer.alloc(4);          // Again - be very careful about this. There is no user involvement in this at all which mitigates Buffer Overflows
+    crytoSizeBuffer.writeUInt32LE(cryptoSize, 0);          // writeUInt32LE() will throw a RangeError instead of Buffer Overflowing in case cryptoSize gets too big somehow
+
+    // Take care of [Signature cryptosystem] 
+    // Because cryptosysBuffer contains a digital signature of the data, this also indirectly signs the data itself
+    let accCryptosysBuffer = Buffer.concat([crytoSizeBuffer, cryptosysBuffer]);
+
+    zeroBuffer(crytoSizeBuffer);
+    zeroBuffer(cryptosysBuffer);
+
+    // Forcibly change to RSA_PKCS1_PSS_PADDING padding and der encoding just in case the user tries to pass them in
+    dsaKey.padding = constants.RSA_PKCS1_PSS_PADDING;
+    dsaKey.dsaEncoding = 'der';
+    let cryptoSigBuffer = Buffer.from(secureSign('sha3-512', accCryptosysBuffer, dsaKey), 'hex');
+
+    // Take care of [1 for Asymmetric][Signature Size : 4 bytes]
+    let sigSize = cryptoSigBuffer.length;
+    let sigSizeBuffer = Buffer.alloc(4);
+    sigSizeBuffer.writeUInt32LE(sigSize, 0);        // Crashes instead of buff overflow if mem error; also we have full control over sigSize
+
+    // Combine everything --> [1 for Asymmetric][Signature Size : 4 bytes][Signature cryptosystem][cryptosystem size : 4 bytes][cryptosystem : up to 2^32 bytes][data]
+    let fileSyntax = Buffer.concat([Buffer.alloc(1, 1), sigSizeBuffer, cryptoSigBuffer, accCryptosysBuffer, data]);
+
+    zeroBuffer(cryptoSigBuffer);
+    zeroBuffer(accCryptosysBuffer);
+    zeroBuffer(sigSizeBuffer);
+    zeroBuffer(data);
+
+    return fileSyntax;
+}   
+
+/**
+ * Converts a file syntax for asymmetric encryption to a JSON cryptosystem.
+ * Also validates the Digital Signatures to check if the file syntax (ie. padding, oaep hash, etc.) stored in the file was tampered with
+ * @param {{key: String, dsaEncoding: String, padding: Number, passphrase: String}} dsaKey JSON object with key and password. Padding is set to `RSA_PKCS1_PSS_PADDING` and DSA encoding is set to `der`.
+ * @param {Buffer} fileBuffer The file buffer, in file syntax
+ * @throws Error if the file syntax is for symmetric encryption.
+ * @throws Error if the digital signatures do not match
+ * @note File Syntax Format: `[1 for Asymmetric][Signature Size : 4 bytes][Signature cryptosystem][cryptosystem size : 4 bytes][cryptosystem : up to 2^32 bytes][data]`
+ * @returns {{cryptoSystem: JSON, data: Buffer}} The cryptosystem and data in a JSON object
+ */
+const fromFileSyntaxAsymm = (dsaKey, fileBuffer) => {
+
+    // Current buffer offset, in bytes
+    let currOffset = 0;
+
+    // Check if it's asymm or symm
+    if (fileBuffer.readUint8(currOffset) != 1)
+    {
+        throw "Error parsing asymmetric file syntax: This file syntax seems to be for something that's symmetrically encrypted. Use `fromFileSyntaxSymm` instead.";
+    }
+    currOffset += 1;
+
+    // Read signature size.
+    let sigSize = fileBuffer.readUInt32LE(currOffset);
+    currOffset += 4;
+
+    // Read the digital signature
+    let signature = fileBuffer.subarray(currOffset, currOffset + sigSize).toString('hex');
+    currOffset += sigSize;
+    var sigOffset = currOffset;
+
+    // Read the cryptosystem
+    let cryptosystemSize = fileBuffer.readUInt32LE(currOffset);
+    currOffset += 4;
+
+    let cryptosystemBuffer = fileBuffer.subarray(currOffset, currOffset + cryptosystemSize);
+    currOffset += cryptosystemSize;
+
+    // Check the signature
+    let accCryptosystem = fileBuffer.subarray(sigOffset, sigOffset + 4 + cryptosystemSize);
+    dsaKey.dsaEncoding = 'der';
+    dsaKey.padding = constants.RSA_PKCS1_PSS_PADDING;   // Forcibly change dsakey options cos user is dumb
+    let isSignatureValid = secureVerify('sha3-512', accCryptosystem, dsaKey, signature);
+
+    if (!isSignatureValid)
+    {
+        throw "Error parsing asymmetric file syntax: Invalid digital signature. Someone might have tampered with your file.";
+    }
+
+    let cryptosystem;
+    try
+    {
+        cryptosystem = JSON.parse(cryptosystemBuffer.toString());
+    }
+    catch(err)
+    {
+        throw `Error parsing asymmetric file syntax: Failed to parse cryptosystem JSON. See error message below.\n${err.toString()}`;
+    }
+
+    // Get the rest of the data
+    let data = fileBuffer.subarray(currOffset);
+
+    return {
+        cryptoSystem: cryptosystem,
+        data: data
+    };
+}
+
+// 🛠️ Testing area 
+// const encAlg = 'aes-256-gcm'
+// let symmEnc = symmetricEncrypt("49ers", "San Francisco", "That's looking Purdy good... except for Moody. He's making me Moody.", encAlg, 12);
+// // symmEnc.encAuthTag = 'c3047f19c8588dca270ec3a0719076ff'
+// // let symmDec = symmetricDecrypt("49ers", "San Francisco", symmEnc.ciphertext, encAlg, symmEnc);
+
+// let ciphertext = symmEnc.ciphertext;
+// delete symmEnc.ciphertext;
+// let fileSyntax = toFileSyntaxSymm(symmEnc, ciphertext, secureKeyGen("San Francisco", 32, symmEnc.hmacSalt).key, 'CLI');
+// console.dir(fileSyntax)
+// let restored = fromFileSyntaxSymm(secureKeyGen("San Francisco", 32, symmEnc.hmacSalt).key, fileSyntax);
+// console.dir(restored);
 
 // 🛠️ DEMO for asymm.
 // let keyPair = genKeyPair('rsa', {
@@ -553,8 +757,12 @@ console.dir(restored);
 // let decrypted = privateDecrypt({key: keyPair.privateKey, oaepHash: 'sha3-512', padding: constants.RSA_PKCS1_OAEP_PADDING, passphrase: 'CMC'}, encrypted);
 
 // let signature = secureSign('sha3-512', encrypted, {key: keyPair.privateKey, passphrase: 'CMC', padding: constants.RSA_PKCS1_PSS_PADDING});
-// console.log(signature.length)
-// let isValid = secureVerify('sha3-512', Buffer.from("hello", "ascii"), {key: keyPair.publicKey, padding: constants.RSA_PKCS1_PSS_PADDING}, signature);
+// // console.log(signature.length)
+// // let isValid = secureVerify('sha3-512', Buffer.from("hello", "ascii"), {key: keyPair.publicKey, padding: constants.RSA_PKCS1_PSS_PADDING}, signature);
 
-// console.dir(decrypted.toString('utf-8'));
-// console.dir(isValid);
+// let cryptosystem = genAsymmCryptosystem(signature, constants.RSA_PKCS1_PSS_PADDING, constants.RSA_PKCS1_OAEP_PADDING, 'sha3-512');
+// let fileSyntax = toFileSyntaxAsymm(cryptosystem, encrypted, {key: keyPair.privateKey, passphrase: 'CMC'}, 'CLI');
+// let restored = fromFileSyntaxAsymm({key: keyPair.publicKey}, fileSyntax);
+// console.log(restored)
+
+// console.log(privateDecrypt({key: keyPair.privateKey, oaepHash: restored.cryptoSystem.oaepHash, padding: restored.cryptoSystem.encryptPadding, passphrase: 'CMC'}, restored.data).toString())
