@@ -103,7 +103,7 @@ For hashes, we'll use `sha3-512`. `sha2` is probably secure enough, but I had to
         * We'll see if it worksd. Even if it doesn't, hopefully that input is sanitized by that library 🤷‍♂️
         * Edit: Apparently we're worrying too much abt this because "Sanitize User input with a library" is apparently much better than what 75% of the companies out there do
 
-## Encrypted files
+## Encrypted files + File Syntax
 * The sent file can be in any format the user desires
     * Although the default CLI command will use a HMAC for symmetric key
     * For asymmetric encryption, the hash will be a DSA (check `Node:Crypto` to see what they support)
@@ -111,6 +111,9 @@ For hashes, we'll use `sha3-512`. `sha2` is probably secure enough, but I had to
 * Serverside Asymmetric: `[1 for Asymmetric][Signature Size : 4 bytes][Signature cryptosystem][cryptosystem size : 4 bytes][cryptosystem : up to 2^32 bytes][data]`
     * Since each encryption alg is going to have different data, this is the best way to format things
     * Treat it as a JSON
+* The HMAC SALT for the cryptosystem can be stored in the cryptosystem itself
+    * Integrity: Attackers can't modify that HMAC SALT because they won't have the password (and by extension, won't have the HMAC). Modifying the SALT does nothing for them
+    * Confidentiality: SALTs aren't meant to be private. They're public info that kinda only exists to add randomness to hash functions (so rainbow attacks go brrr)
 * Encrypt the already encrypted file again! Use the password hash or public key. 
 * This means if a dummy user decides to not upload an encrypted file or not give us an actual password hash, they still benefit from good ol' security
 * And if they do, tada! End to end 😎

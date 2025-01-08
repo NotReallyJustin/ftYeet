@@ -375,7 +375,7 @@ const secureVerify = (hashAlg, data, verifyKeyObject, signature) => {
     }
     catch(err)
     {
-        throw `Error when verifying: ${err.toString()}. Usually this occurs because of a wrong passphrase when decrypting the private key.`;
+        throw `Error when verifying: ${err.message}. Usually this occurs because of a wrong passphrase when decrypting the private key.`;
     }
     
     zeroBuffer(signatureBuffer);
@@ -389,13 +389,13 @@ const secureVerify = (hashAlg, data, verifyKeyObject, signature) => {
  * The standardized format is [0 for Symmetric][HMAC Size : 4 bytes][HMAC cryptosystem : 64 bytes][cryptosystem size : 4 bytes][cryptosystem : up to 2^32 bytes][data]
  * @param {{signature:String}} cryptosystem JSON of all the authtags, SALTs, and IVs used to encrypt and HMAC the data. Must include HMAC. 🚨 DO NOT PUT THE KEYS IN HERE 🚨
  * @param {Buffer} data (Encrypted) data to write to the file
- * @param {String} hmacKey Key to HMAC the entire cryptosystem with (in hex). This could be the authentication key you used to HMAC the data from earlier.
+ * @param {{key: String, salt: String}} hmacCryptosys Key and SALT that's going to be used to HMAC the entire cryptosystem with (in hex). This could be the authentication key and SALT you used to HMAC the data itself. If you don't know what I'm talking about, pass in the cryptosystem you obtained from running `secureKeyGen()`.
  * @param {String} source The platform that encrypted the data. Either `CLI`, `Server`, or `Web`. Used for compatiability purposes
  * @throws Error if hmac is not in the cryptosystem because that is very important
  * @throws Error if source is not `CLI`, `Server`, or `Web`
  * @returns {Buffer} A standardized buffer you can write to files
  */
-const toFileSyntaxSymm = (cryptosystem, data, hmacKey, source) => {
+const toFileSyntaxSymm = (cryptosystem, data, hmacCryptosys, source) => {
     
     // Error checks
     if (cryptosystem.hmac == undefined)
@@ -411,6 +411,8 @@ const toFileSyntaxSymm = (cryptosystem, data, hmacKey, source) => {
     // No buffer overflows because we're not directly reading anything into the buffer. We're just concatenating other buffers with the initial empty buffer.
     // `Node.js` is also memory safe. There's a function allocUnsafe() that acts like C but we're not touching that
     cryptosystem.source = source;
+    cryptosystem.hmacCryptosysSalt = hmacCryptosys.salt;
+
     let cryptosysBuffer = Buffer.from(JSON.stringify(cryptosystem));    // If it looks like JSON, it is JSON. God must have invented JSON because it's beautiful
 
     // Take care of [cryptosystem size : 4 bytes]
@@ -432,7 +434,7 @@ const toFileSyntaxSymm = (cryptosystem, data, hmacKey, source) => {
     zeroBuffer(crytoSizeBuffer);
     zeroBuffer(cryptosysBuffer);
 
-    let hmacKeyBuffer = Buffer.from(hmacKey, 'hex');
+    let hmacKeyBuffer = Buffer.from(hmacCryptosys.key, 'hex');
     let hmacBuffer = Buffer.from(genHMAC(hmacKeyBuffer, 'sha3-512', accCryptosysBuffer), 'hex');
     zeroBuffer(hmacKeyBuffer);
     if (hmacBuffer.length != 64)
@@ -459,14 +461,22 @@ const toFileSyntaxSymm = (cryptosystem, data, hmacKey, source) => {
 /**
  * Converts a file syntax for symmetric encryption to a JSON cryptosystem.
  * Also validates the HMAC to check if the file syntax (IVs, SALTs, etc.) stored in the file was tampered with
- * @param {String} hmacKey Key to HMAC the entire cryptosystem with (in hex). This could be the authentication key you used to HMAC the data from earlier.
+ * @param {String} hmacKey Key to HMAC the entire cryptosystem with (in hex). This could be the authentication key you used to HMAC the data from earlier. ❗Mutually exclusive with `hmacPasswd`.
+ * @param {String} hmacPasswd Password/Authcode used in the KDF to generate the HMAC for the entire cryptosystem. The SALT is already in the file syntax. ❗Mutually exclusive with `hmacKey`.
  * @param {Buffer} fileBuffer The file buffer, in file syntax
  * @throws Error if the file syntax is for asymmetric encryption.
  * @throws Error if the HMACs do not match
+ * @throws Error if both `hmacKey` and `hmacPasswd` are provided. One of them must be `undefined`.
  * @note File Syntax Format: [0 for Symmetric][HMAC Size : 4 bytes][HMAC cryptosystem : 64 bytes][cryptosystem size : 4 bytes][cryptosystem : up to 2^32 bytes][data]
  * @returns {{cryptoSystem: JSON, data: Buffer}}
  */
-const fromFileSyntaxSymm = (hmacKey, fileBuffer) => {
+const fromFileSyntaxSymm = (hmacKey, hmacPasswd, fileBuffer) => {
+    
+    if (hmacKey != undefined && hmacPasswd != undefined)
+    {
+        throw "Error parsing symmetric file syntax: Parameters `hmacKey` and `hmacPasswd` are mutually exclusive. Pick one.";
+    }
+
     // Remember in Node, buffers are read in bytes
     let currOffset = 0;
 
@@ -485,7 +495,7 @@ const fromFileSyntaxSymm = (hmacKey, fileBuffer) => {
     }
     currOffset += 4;
 
-    // Read HMAC - This should be 64 bytes
+    // Read HMAC - This should be 64 bytes. This will be used later to check cryptosystem integrity
     let hmacRead = fileBuffer.subarray(currOffset, currOffset + 64).toString('hex');
     currOffset += 64;
     var hmacOffset = currOffset;                // Store where the end of the HMAC is. We'll need to reference it later.
@@ -497,23 +507,26 @@ const fromFileSyntaxSymm = (hmacKey, fileBuffer) => {
     let cryptosystemBuffer = fileBuffer.subarray(currOffset, currOffset + cryptosystemSize);
     currOffset += cryptosystemSize;
 
-    // Check the HMAC
-    let accCryptosystem = fileBuffer.subarray(hmacOffset, hmacOffset + 4 + cryptosystemSize);
-    let hmac = genHMAC(hmacKey, 'sha3-512', accCryptosystem);
-
-    if (hmac != hmacRead)
-    {
-        throw "Error parsing symmetric file syntax: Cryptosystem HMAC mismatch. Someone might have tampered with your file.";
-    }
-
-    let cryptosystem;
+    let cryptosystem;           // Parse the cryptosystem into JSON
     try
     {
         cryptosystem = JSON.parse(cryptosystemBuffer.toString());
     }
     catch(err)
     {
-        throw `Error parsing symmetric file syntax: Failed to parse cryptosystem JSON. See error message below.\n${err.toString()}`;
+        throw `Error parsing symmetric file syntax: Failed to parse cryptosystem JSON. See error message below.\n${err.message}`;
+    }
+
+    // Check the actual HMAC with the HMAC inside the file syntax
+    // Users can either put in a hmac key or the hmac password (more realistic). Regardless, generate the key here.
+    let key = hmacKey != undefined ? hmacKey : secureKeyGen(hmacPasswd, 32, cryptosystem.hmacCryptosysSalt).key;
+
+    let accCryptosystem = fileBuffer.subarray(hmacOffset, hmacOffset + 4 + cryptosystemSize);
+    let hmac = genHMAC(key, 'sha3-512', accCryptosystem);
+
+    if (hmac != hmacRead)
+    {
+        throw "Error parsing symmetric file syntax: Cryptosystem HMAC mismatch. Someone might have tampered with your file.";
     }
 
     // Get the rest of the data
@@ -599,7 +612,7 @@ const validateAsymmCryptosystem = (cryptosystem) => {
  * The standardized format is `[1 for Asymmetric][Signature Size : 4 bytes][Signature cryptosystem][cryptosystem size : 4 bytes][cryptosystem : up to 2^32 bytes][data]`
  * @param {{dsaPadding: Number, encryptPadding: Number, oaepHash: String|undefined}} cryptosystem JSON of asymmetric cryptosystem
  * @param {Buffer} data (Encrypted) data to write to the file
- * @param {{key: String, dsaEncoding: String, padding: Number, passphrase: String}} dsaKey JSON object with key and password. Encoding is forcibly set to `der` and padding is set to `RSA_PKCS1_PSS_PADDING`.
+ * @param {{key: String, dsaEncoding: String, padding: Number, passphrase: String}} dsaKey JSON object with key and password used to generate a digital signature. Encoding is forcibly set to `der` and padding is set to `RSA_PKCS1_PSS_PADDING`.
  * @param {String} source The platform that encrypted the data. Either `CLI`, `Server`, or `Web`. Used for compatiability purposes
  * @throws Error cryptosystem is improperly formatted
  * @throws Error if source is not `CLI`, `Server`, or `Web`
@@ -663,7 +676,7 @@ const toFileSyntaxAsymm = (cryptosystem, data, dsaKey, source) => {
 /**
  * Converts a file syntax for asymmetric encryption to a JSON cryptosystem.
  * Also validates the Digital Signatures to check if the file syntax (ie. padding, oaep hash, etc.) stored in the file was tampered with
- * @param {{key: String, dsaEncoding: String, padding: Number, passphrase: String}} dsaKey JSON object with key and password. Padding is set to `RSA_PKCS1_PSS_PADDING` and DSA encoding is set to `der`.
+ * @param {{key: String, dsaEncoding: String, padding: Number, passphrase: String}} dsaKey JSON object with key and password used to decrypt the digital signature. Padding is set to `RSA_PKCS1_PSS_PADDING` and DSA encoding is set to `der`.
  * @param {Buffer} fileBuffer The file buffer, in file syntax
  * @throws Error if the file syntax is for symmetric encryption.
  * @throws Error if the digital signatures do not match
@@ -716,7 +729,7 @@ const fromFileSyntaxAsymm = (dsaKey, fileBuffer) => {
     }
     catch(err)
     {
-        throw `Error parsing asymmetric file syntax: Failed to parse cryptosystem JSON. See error message below.\n${err.toString()}`;
+        throw `Error parsing asymmetric file syntax: Failed to parse cryptosystem JSON. See error message below.\n${err.message}`;
     }
 
     // Get the rest of the data
@@ -736,9 +749,9 @@ const fromFileSyntaxAsymm = (dsaKey, fileBuffer) => {
 
 // let ciphertext = symmEnc.ciphertext;
 // delete symmEnc.ciphertext;
-// let fileSyntax = toFileSyntaxSymm(symmEnc, ciphertext, secureKeyGen("San Francisco", 32, symmEnc.hmacSalt).key, 'CLI');
+// let fileSyntax = toFileSyntaxSymm(symmEnc, ciphertext, secureKeyGen("San Francisco", 32, symmEnc.hmacSalt), 'CLI');
 // console.dir(fileSyntax)
-// let restored = fromFileSyntaxSymm(secureKeyGen("San Francisco", 32, symmEnc.hmacSalt).key, fileSyntax);
+// let restored = fromFileSyntaxSymm(undefined, "San Francisco", fileSyntax);
 // console.dir(restored);
 
 // 🛠️ DEMO for asymm.

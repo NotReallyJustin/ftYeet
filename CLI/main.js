@@ -80,7 +80,8 @@ program
     .option('-a, --algorithm [chacha20-poly1305|aes-256-gcm|aes256-cbc]', 'symmetric algorithm for encrypting the file', 'chacha20-poly1305')
     .option('-c, --auth-code [password]', 'authentication code used to generate file HMAC; password would be used if this is left empty')
     .action((options) => {
-        console.dir(options)
+        functions.uploadSymm(options.file, options.password, options.algorithm, options.authCode != undefined ? options.authCode : options.password);
+        console.log("File upload complete.");
     })
 
 program.parse(process.argv);
