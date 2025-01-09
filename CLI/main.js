@@ -83,5 +83,52 @@ program
         functions.uploadSymm(options.file, options.password, options.algorithm, options.authCode != undefined ? options.authCode : options.password);
         console.log("File upload complete.");
     })
+;
+
+program
+    .command("download")
+    .description("Downloads a file from the ftYeet server and decrypts it")
+    .requiredOption('-u, --url <url>', 'ftYeet URL where the resource/file is stored')
+    .requiredOption('-d, --directory <directory>', 'where the downloaded files will be stored')
+    .requiredOption('-p, --password <password>', 'password used to decrypt the file locally; also used to HMACs if -c is empty')
+    .option('-a, --algorithm [chacha20-poly1305|aes-256-gcm|aes256-cbc]', 'symmetric algorithm for decrypting the file; ' + 
+        'decryption may fail if this does not match the one used to encrypt', 'chacha20-poly1305')
+    .option('-c, --auth-code [password]', 'authentication code used to verify file HMAC; password would be used if this is left empty')
+    .action((options) => {
+        console.dir(options)
+    })
+;
+
+program
+    .command("upload-asymm")
+    .description("Encrypts a local file ASYMMETRICALLY with RSA, digitally signs it (algorithm depends on your key), and uploads it to a ftYeet server." +
+        "By using this command, you agree that you understand how asymmetric encryption works on a basic level (and how it preserves confidentiality).")
+    .requiredOption('-f, --file <path>', 'path of the file to upload')
+    .requiredOption('-e, --encryption-key <path>', 'path of key file used to encrypt your file; usually, this is the recipient\'s public key')
+    .requiredOption('-s, --signature-key <path>', 'path of key file used to digitally sign your encrypted file; usually, this is your private key')
+    .option('-o, --encryption-key-pwd [password]', 'password for your encryption key file, if you have one')
+    .option('-p, --signature-key-pwd [password]', 'password for your signature key file, if you have one')
+    .option('-r, --signature-padding [RSA_PKCS1_PSS_PADDING|RSA_PKCS1_PADDING]', 'padding for digital signature (if RSA)', 'RSA_PKCS1_PSS_PADDING')
+    .option('-t, --encryption-padding [RSA_PKCS1_PSS_PADDING|RSA_PKCS1_OAEP_PADDING]', 'padding for RSA asymmetric encryption; if you choose OAEP Padding,' +
+        ' the hash is SHA3-512', 'RSA_PKCS1_OAEP_PADDING')
+    .action((options) => {
+        functions.uploadAsymm(options.file, options.signatureKey, options.signatureKeyPwd, options.encryptionKey, options.encryptionKeyPwd, 
+            options.signaturePadding, options.encryptionPadding);
+    })
+;
+
+program
+    .command("download-asymm")
+    .description("Downloads a file from the ftYeet server and decrypts it ASYMMETRICALLY.")
+    .requiredOption('-u, --url <url>', 'ftYeet URL where the resource/file is stored')
+    .requiredOption('-d, --directory <directory>', 'where the downloaded files will be stored')
+    .requiredOption('-e, --decryption-key <path>', 'path of key file used to decrypt your file; usually, this is your private key')
+    .requiredOption('-s, --verify-key <path>', 'path of key file used to verify the signature of your downloaded file; usually, this is the sender\'s public key')
+    .option('-o, --decryption-key-pwd [password]', 'password for your decryption key file, if you have one')
+    .option('-p, --verify-key-pwd [password]', 'password for your verification key file, if you have one')
+    .action((options) => {
+        functions.downloadAsymm(options.directory, options.url, options.verifyKey, options.verifyKeyPwd, options.decryptionKey, options.decryptionKeyPwd);
+    })
+;
 
 program.parse(process.argv);

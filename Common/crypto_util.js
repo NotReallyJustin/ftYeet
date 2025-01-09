@@ -323,13 +323,22 @@ const secureSign = (hashAlg, data, signKeyObject) => {
     }
 
     let signature;              // Buffer
-    try
+    try                         // If we can, force sha3-512 or the hashAlg. If the algorithm is uncompromising with its hashes (like ED25519), let it cook.
     {
         signature = sign(hashAlg, data, signKeyObject);
     }
     catch(err)
     {
-        throw `Error when signing: ${err}.\n Usually this occurs because of a wrong passphrase when decrypting the private key.`;
+        try
+        {
+            console.log("We got an internal issue with `Node.js` itself when trying to sign the data. This might be an ED25519 key. Trying workaround...");
+            console.log("Note: ED25519 uses SHA2-512 internally.")
+            signature = sign(null, data, signKeyObject);
+        }
+        catch(err2)
+        {
+            throw `Error when signing: ${err2}.\n Usually this occurs because of a wrong passphrase when decrypting the private key.`;
+        }
     }
 
     let signatureHex = signature.toString('hex');
@@ -375,7 +384,16 @@ const secureVerify = (hashAlg, data, verifyKeyObject, signature) => {
     }
     catch(err)
     {
-        throw `Error when verifying: ${err.message}. Usually this occurs because of a wrong passphrase when decrypting the private key.`;
+        try
+        {
+            console.log("We got an internal issue with `Node.js` itself when trying to sign the data. This might be an ED25519 key. Trying workaround...");
+            console.log("Note: ED25519 uses SHA2-512 internally.")
+            signatureValid = verify(null, data, verifyKeyObject, signatureBuffer);
+        }
+        catch(err2)
+        {
+            throw `Error when signing: ${err2}.\n Usually this occurs because of a wrong passphrase when decrypting the private key.`;
+        }
     }
     
     zeroBuffer(signatureBuffer);
@@ -514,7 +532,7 @@ const fromFileSyntaxSymm = (hmacKey, hmacPasswd, fileBuffer) => {
     }
     catch(err)
     {
-        throw `Error parsing symmetric file syntax: Failed to parse cryptosystem JSON. See error message below.\n${err.message}`;
+        throw `Error parsing symmetric file syntax: Failed to parse cryptosystem JSON. See error message below.\n${err}`;
     }
 
     // Check the actual HMAC with the HMAC inside the file syntax
@@ -580,13 +598,13 @@ const validateAsymmCryptosystem = (cryptosystem) => {
 
     if (cryptosystem.dsaPadding != constants.RSA_PKCS1_PSS_PADDING && cryptosystem.dsaPadding != constants.RSA_PKCS1_PADDING)
     {
-        throw "Cryptosystem is invalid: dsaPadding type is unsupported.";
+        throw "Cryptosystem is invalid: dsaPadding type is unsupported. Must be RSA_PKCS1_PSS_PADDING or RSA_PKCS1_PADDING.";
         return false;
     }
 
     if (cryptosystem.encryptPadding != constants.RSA_PKCS1_OAEP_PADDING && cryptosystem.encryptPadding != constants.RSA_PKCS1_PADDING)
     {
-        throw "Cryptosystem is invalid: encryptPadding type is unsupported.";
+        throw "Cryptosystem is invalid: encryptPadding type is unsupported. Must be RSA_PKCS1_OAEP_PADDING or RSA_PKCS1_PADDING.";
         return false;
     }
 
@@ -729,7 +747,7 @@ const fromFileSyntaxAsymm = (dsaKey, fileBuffer) => {
     }
     catch(err)
     {
-        throw `Error parsing asymmetric file syntax: Failed to parse cryptosystem JSON. See error message below.\n${err.message}`;
+        throw `Error parsing asymmetric file syntax: Failed to parse cryptosystem JSON. See error message below.\n${err}`;
     }
 
     // Get the rest of the data
