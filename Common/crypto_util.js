@@ -1,6 +1,6 @@
 // Node.js built-in crypto library (should be decently secure)
 // Providing all functions I'm using here for transparency reasons
-const { 
+import { 
     createHmac,
     sign,
     randomBytes,
@@ -17,7 +17,7 @@ const {
     createCipheriv,
     createDecipheriv,
     constants
-} = await import('node:crypto');
+} from 'node:crypto';
 
 export { supportedCiphers, supportedAsymmetrics, secureKeyGen, zeroBuffer, symmetricDecrypt, symmetricEncrypt, secureSign, secureVerify, compatPrivKE, compatPubKE, genKeyPair, 
     keyEncodingFormats, keyEncodingTypes, supportedHashes, genHMAC, fromFileSyntaxAsymm, toFileSyntaxAsymm, fromFileSyntaxSymm, toFileSyntaxSymm, genAsymmCryptosystem }
