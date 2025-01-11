@@ -1,0 +1,14 @@
+{
+  "name": "ftyeet-server",
+  "version": "1.0.0",
+  "description": "Server for ftYeet",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "ftYeet"
+  ],
+  "author": "Justin",
+  "license": "GPL-3.0-only"
+}

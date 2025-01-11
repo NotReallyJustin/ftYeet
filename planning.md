@@ -60,17 +60,17 @@ God I love this language <br>
 
 ## More on Symmetric Encryption + Key Generation
 * Intrusive thought: Can't we just add a random timer to prevent side channel attacks
-* Allow users to put in authentication codes (basically they serve to generate a MAC). If they don't, we'll use a different SALT to generate an HMAC key
-    * If one of the keys get compromised, the master key is still safe because of Key Derivation function
-* SALT and IV can be transmitted with encrypted data (or included in the URL). Their job is to introduce randomness (and not act as a second authentication factor)
+* Allow users to put in authentication codes (basically they serve to generate a MAC). If they don't, we'll use a different SALT to generate an HMAC key ✅
+    * If one of the keys get compromised, the master key is still safe because of Key Derivation function ✅
+* SALT and IV can be transmitted with encrypted data (or included in the URL). Their job is to introduce randomness (and not act as a second authentication factor) ✅
 
 ## More on Asymmetric Encryption
-* In case I forget, sign w/ your private key & encrypt with their public key.
-* The user should have the other person's public key. That also acts as authentication lowkey
-* For passwords: Store person A's public key. Still encrypt with person A's public key
+* In case I forget, sign w/ your private key & encrypt with their public key. ✅
+* The user should have the other person's public key. That also acts as authentication lowkey ✅
+* For passwords: Store person A's public key. Still encrypt with person A's public key ✅
 * For sending/authenticating: Store person B's public key. Challenge them with that. A's stuff can be done clientside
 
-## Supported Ciphers
+## Supported Ciphers ✅
 Huge shoutout to `https://soatok.blog/2020/05/13/why-aes-gcm-sucks/` and `https://soatok.blog/2020/07/12/comparison-of-symmetric-encryption-methods/#aes-gcm-vs-chacha20poly1305`
 * `chacha20-poly1305` - This server is probably not running with Hardware Acceleration, so a built-in MAC + constant time processing is good
     * Also won't leak all your information, just sayin'
@@ -103,19 +103,19 @@ For hashes, we'll use `sha3-512`. `sha2` is probably secure enough, but I had to
         * We'll see if it worksd. Even if it doesn't, hopefully that input is sanitized by that library 🤷‍♂️
         * Edit: Apparently we're worrying too much abt this because "Sanitize User input with a library" is apparently much better than what 75% of the companies out there do
 
-## Encrypted files + File Syntax
-* The sent file can be in any format the user desires
-    * Although the default CLI command will use a HMAC for symmetric key
-    * For asymmetric encryption, the hash will be a DSA (check `Node:Crypto` to see what they support)
-* Serverside: `[0 for Symmetric][HMAC Size : 4 bytes][HMAC cryptosystem : 64 bytes][cryptosystem size : 4 bytes][cryptosystem : up to 2^32 bytes][data]`
-* Serverside Asymmetric: `[1 for Asymmetric][Signature Size : 4 bytes][Signature cryptosystem][cryptosystem size : 4 bytes][cryptosystem : up to 2^32 bytes][data]`
-    * Since each encryption alg is going to have different data, this is the best way to format things
+## Encrypted files + File Syntax ✅
+* The sent file can be in any format the user desires ✅
+    * Although the default CLI command will use a HMAC for symmetric key ✅
+    * For asymmetric encryption, the hash will be a DSA (check `Node:Crypto` to see what they support) ✅
+* Serverside: `[0 for Symmetric][HMAC Size : 4 bytes][HMAC cryptosystem : 64 bytes][cryptosystem size : 4 bytes][cryptosystem : up to 2^32 bytes][data]` ✅
+* Serverside Asymmetric: `[1 for Asymmetric][Signature Size : 4 bytes][Signature cryptosystem][cryptosystem size : 4 bytes][cryptosystem : up to 2^32 bytes][data]` ✅
+    * Since each encryption alg is going to have different data, this is the best way to format things 
     * Treat it as a JSON
-* The HMAC SALT for the cryptosystem can be stored in the cryptosystem itself
+* The HMAC SALT for the cryptosystem can be stored in the cryptosystem itself ✅
     * Integrity: Attackers can't modify that HMAC SALT because they won't have the password (and by extension, won't have the HMAC). Modifying the SALT does nothing for them
     * Confidentiality: SALTs aren't meant to be private. They're public info that kinda only exists to add randomness to hash functions (so rainbow attacks go brrr)
-* Encrypt the already encrypted file again! Use the password hash or public key. 
-* This means if a dummy user decides to not upload an encrypted file or not give us an actual password hash, they still benefit from good ol' security
+* Encrypt the already encrypted file again! Use the password hash or public key. ✅
+* This means if a dummy user decides to not upload an encrypted file or not give us an actual password hash, they still benefit from good ol' security ✅
 * And if they do, tada! End to end 😎
 
 ## Automatic Burn
@@ -127,7 +127,8 @@ For hashes, we'll use `sha3-512`. `sha2` is probably secure enough, but I had to
     * Recovery should be pretty simple - we have a database that kind of tells you what's expired and what you need to delete
 * Zero out the memory if we can find a way to do that
 
-## FtYeet Protocol
+## FtYeet Protocol  --> Stateful ❌
+* Probably not doing this; Prolly because anything stateful and public facing will be slow
 * TCP Port 4000 (don't worry the server will not be running Diablo 2)
 * Provide CLI to interact with this thing
 * Protocol to upload:
@@ -172,7 +173,68 @@ For hashes, we'll use `sha3-512`. `sha2` is probably secure enough, but I had to
     -----------------> Encrypted file (decryption done clientside)
 ```
 * This makes way more sense when you realize that we're encrypting the files twice
-    
+
+## FtYeet Protocol --> Stateless + JWT
+* Since we're making it stateless, we might as well tunnel the whole thing under HTTPS
+    * `certbot` and `LetsEncrypt` only works for HTTPS
+    * I guess I could buy a SSL cert but those cost $
+    * Also HTTPS is arguably more secure than me trying to parse `base64` encodings of binary files, public keys, etc.
+    * Also this means we only need to worry about 1 application on 1 port which is kind of nice 😃
+    * Also because the upload will have a lot of arguments so it's easier to manage 
+* Upload:
+```
+POST: https://api.ftyeet.something/upload
+    --> fileSyntax
+    --> file
+    --> expireTime
+    --> burnOnRead
+    --> publicKey (if needed)
+        * Server will store public key used to encrypt the file
+        * HOWEVER - the server can't spoof anything because there's a digital signature - and the server doesn't have the private key used to sign stuff
+```
+* **Download Asymm:**
+* JWT tokens last for 15 seconds. They're meant to be used immediately
+* Ideally, these tokens are used once
+```
+POST: https://api.ftyeet.something/auth
+    --> JWT Token of URL, timestamp, ip, and nonce - signed w/ end user's private key 
+        * Server verifies with public key on file
+        * IP is there to mitigate/stop replay attacks from unauthorized servers. Prompt user in CLI to put in VPN IP if that's a thing
+    <-- JWT token of URL, new timestamp, ip, jiti (basically new nonce), and matching nonce - signed w/ server's JWT private key
+        * Do we need a jiti?
+        * Store the last hash of the jiti for the URL in the database
+        * Only 1 active jiti at a time
+        * Destroy on read
+
+    * The nonce doesn't do anything; it's just there to add randomness to our signature
+    * Client doesn't need to verify JWT signature. Just check that the nonces are the same to ensure the JWT is actually for them
+    * Server will store the nonce
+
+POST: https://api.ftyeet.something/downloadAsymm
+    --> Pass in JWT token from earier
+        * Server verifies IP and timestamp and JITI
+        * Server verifies the signature with its own JWT public key (don't explicitly show this to others)
+    <-- Encrypted file
+```
+* Alternative Download Asymm idea that might clean a lot of stuff up:
+```
+POST: https://api.ftyeet.something/downloadAsymm
+    --> Pass in JWT token of URL, timestamp, IP, and nonce - signed w/ end user's private key
+        * Restrict it to RS512 or smth
+        * Server verifies JWT token signature using public key on file
+        * Server verifies IP and timestamp. Give users option for VPN
+        * Request is invalid if 15 seconds has passed
+        * Store last nonce used in SQL database. The next request cannot have the same nonce (to prevent replay attacks - but lowkey if that happens, TLS is compromised and the world is cooked. But hey! If TLS is compromised, at least ftYeet would still be confidential)
+```
+* **Download Symm**
+```
+POST: https://api.ftyeet.something/download
+    --> URL, Hash(Hash(password))
+        * Server will compare it by hashing Hash(password)
+    <-- Encrypted file *OR* Error
+```
+* Even if someone managed to bypass the auth process by exploiting the JWT token somehow, they still have to deal with E2EE
+* Auth was only there to make sure we're not sending the encrypted file itself to people who don't need the encrypted file. 👮‍♂️ Doing our part to delay Quantum Computers
 
 ## Main Site Authenticate
 * Insert password
