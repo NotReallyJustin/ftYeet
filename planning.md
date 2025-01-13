@@ -192,6 +192,7 @@ POST: https://api.ftyeet.something/upload
         * Server will store public key used to encrypt the file
         * HOWEVER - the server can't spoof anything because there's a digital signature - and the server doesn't have the private key used to sign stuff
 ```
+
 * **Download Asymm:**
 * JWT tokens last for 15 seconds. They're meant to be used immediately
 * Ideally, these tokens are used once
@@ -210,7 +211,7 @@ POST: https://api.ftyeet.something/auth
     * Client doesn't need to verify JWT signature. Just check that the nonces are the same to ensure the JWT is actually for them
     * Server will store the nonce
 
-POST: https://api.ftyeet.something/downloadAsymm
+GET: https://api.ftyeet.something/downloadAsymm
     --> Pass in JWT token from earier
         * Server verifies IP and timestamp and JITI
         * Server verifies the signature with its own JWT public key (don't explicitly show this to others)
@@ -218,7 +219,7 @@ POST: https://api.ftyeet.something/downloadAsymm
 ```
 * Alternative Download Asymm idea that might clean a lot of stuff up:
 ```
-POST: https://api.ftyeet.something/downloadAsymm
+GET: https://api.ftyeet.something/downloadAsymm
     --> Pass in JWT token of URL, timestamp, IP, and nonce - signed w/ end user's private key
         * Restrict it to RS512 or smth
         * Server verifies JWT token signature using public key on file
@@ -228,13 +229,20 @@ POST: https://api.ftyeet.something/downloadAsymm
 ```
 * **Download Symm**
 ```
-POST: https://api.ftyeet.something/download
+GET: https://api.ftyeet.something/download
     --> URL, Hash(Hash(password))
         * Server will compare it by hashing Hash(password)
     <-- Encrypted file *OR* Error
 ```
 * Even if someone managed to bypass the auth process by exploiting the JWT token somehow, they still have to deal with E2EE
 * Auth was only there to make sure we're not sending the encrypted file itself to people who don't need the encrypted file. 👮‍♂️ Doing our part to delay Quantum Computers
+* **405 ERRORS**
+    * I know it's good practice to return `405` errors, but that could be exploited by adversaries to unintentionally find and flood API endpoints.
+    * Instead, we're going to 
+* **Subdomains**
+    * Use `express-subdomain` to handle this
+    * We're going to try to merge the `ftYeet` protocol tunneling with the genuine website in one go by manipulating React Routers as a shortcut
+    * To test locally, modify `hosts` file in `system32/drivers/etc`
 
 ## Main Site Authenticate
 * Insert password

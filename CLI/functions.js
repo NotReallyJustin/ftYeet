@@ -19,6 +19,7 @@ export { keygen, uploadSymm, uploadAsymm, downloadSymm, downloadAsymm }
 function keygen(pubkeyPath, privkeyPath, encryptAlg, options)
 {
     // First check if you can even write the public keys
+    // TODO: If RSA, make it 4096 
     if (fileUtil.exists(pubkeyPath))
     {
         throw `Error when generating keys: ${pubkeyPath} already contains a file.`;
