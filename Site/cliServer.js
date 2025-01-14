@@ -6,7 +6,7 @@
 */
 
 import * as express from 'express';
-import { isValidPubKey } from '../Common/crypto_util.js';
+import { pubKeyType, base64ToPubKey } from '../Common/crypto_util.js';
 
 const apiRouter = express.Router({
     mergeParams: true               // Keep req.params from parent router
@@ -113,7 +113,7 @@ apiRouter.post("/uploadAsymm", (request, response) => {
     {
         return response.status(400).send("Error when uploading: You must provide a public-key. This should be done for you via the CLI.");
     }
-    else if (!isValidPubKey(request.headers['public-key']))
+    else if (pubKeyType(request.headers['public-key']) == 'none')
     {
         return response.status(400).send("Error when uploading: The public-key you provided is invalid. It's probably not a public key.");
     }

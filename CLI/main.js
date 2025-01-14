@@ -1,7 +1,27 @@
-import { Command } from 'commander';
+import { Command, InvalidArgumentError } from 'commander';
 import * as functions from './functions.js';
 const program = new Command();
 
+// ⚒️ Helper processing methods
+
+/**
+ * Forcibly converts a string argument into a number
+ * @param {String} userArg The user provided argument
+ * @param {Number} prev The default argument, if any
+ * @throws InvalidArgumentError if it's not a number
+ * @returns {Number} The argument, as a number
+ */
+const forceNum = (userArg, prev) => {
+    const parsedValue = parseInt(userArg != undefined ? userArg : prev);
+    if (isNaN(parsedValue)) 
+    {
+        throw new InvalidArgumentError('Not a number.');
+    }
+
+    return parsedValue;
+}
+
+// 💻 Commander CLI program
 program
     .version("1.0")
     .name("ftYeet")
@@ -79,9 +99,12 @@ program
     .requiredOption('-f, --file <path>', 'path of the file to upload')
     .option('-a, --algorithm [chacha20-poly1305|aes-256-gcm|aes256-cbc]', 'symmetric algorithm for encrypting the file', 'chacha20-poly1305')
     .option('-c, --auth-code [password]', 'authentication code used to generate file HMAC; password would be used if this is left empty')
+    .option('-t, --expire-time [seconds]', 'how long the server should hold on to the uploaded file; must be >= 60', forceNum, 300)
+    .option('-b, --burn', 'whether to burn the file upon download', false)
     .action((options) => {
-        functions.uploadSymm(options.file, options.password, options.algorithm, options.authCode != undefined ? options.authCode : options.password);
-        console.log("File upload complete.");
+        functions.uploadSymm(options.file, options.password, options.algorithm, options.authCode != undefined ? options.authCode : options.password, 
+            options.expireTime, options.burn
+        );
     })
 ;
 

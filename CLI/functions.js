@@ -2,11 +2,26 @@
 // Justin notation: () => {} if there's no side effects. function() {} if there is.
 import * as cryptoUtil from '../Common/crypto_util.js';
 import * as fileUtil from '../Common/file_util.js';
+import fetch from 'node-fetch';
 import { writeFileSync, readFileSync } from 'node:fs';
 import { constants, publicEncrypt, privateDecrypt } from 'node:crypto';
-import { dirname } from 'node:path';
+import { dirname, basename } from 'node:path';
+import { Agent } from 'https';
 
 export { keygen, uploadSymm, uploadAsymm, downloadSymm, downloadAsymm }
+
+/**
+ * The domain name of the "website" that our ftYeet protocol is tunneled under
+ */
+const HTTPS_TUNNEL = 'https://api.ftyeet.com';
+
+/**
+ * Temporary SSL agent until we get a proper SSL cert for ftYeet.
+ * Bypasses the Self-Signed Cert warnings.
+ */
+const IGNORE_SSL_AGENT = new Agent({
+    rejectUnauthorized: false
+});
 
 /**
  * Generates a public/private keypair and writes it to a given file
@@ -91,9 +106,16 @@ function keygen(pubkeyPath, privkeyPath, encryptAlg, options)
  * @param {String} password Password to generate encryption key
  * @param {String} encAlg Encryption algorithm
  * @param {String} authCode Password to generate HMAC key
+ * @param {Number} expireTime How long should the ftYeet server hold on to your file (in seconds). Must be `>= 60`.
+ * @param {Boolean} burnOnRead Whether ftYeet should delete the file immediately upon download
  */
-function uploadSymm(filePath, password, encAlg, authCode)
-{
+function uploadSymm(filePath, password, encAlg, authCode, expireTime, burnOnRead)
+{  
+    if (expireTime < 60)
+    {
+        throw `Error when uploading file: expire-time must be longer than 60 seconds.`;
+    }
+
     if (!fileUtil.exists(filePath))
     {
         throw `Error when uploading file: ${filePath} does not exist.`;
@@ -135,9 +157,34 @@ function uploadSymm(filePath, password, encAlg, authCode)
     let hmacCryptosys = cryptoUtil.secureKeyGen(authCode, 32, symmEnc.hmacSalt);
     let fileSyntax = cryptoUtil.toFileSyntaxSymm(symmEnc, ciphertext, hmacCryptosys, 'CLI');
     
-    // Test. This should ideally just clone the two files
-    // Remove when testing is done
-    downloadSymm('./', password, encAlg, authCode, '', fileSyntax);
+    // Send fetch request to website
+    fetch(`${HTTPS_TUNNEL}/upload`, {
+        method: 'POST',
+        headers: {
+            // TODO Maybe encrypt this as well
+            "file-name": basename(filePath),
+            "expire-time": expireTime,
+            "burn-on-read": burnOnRead,
+            "pwd-hash": cryptoUtil.genPwdHash(password, 64)
+        },
+        body: fileSyntax,
+        follow: 1,
+        agent: IGNORE_SSL_AGENT
+    }).then((response) => {
+        if (response.ok)
+        {
+            console.log("File successfully encrypted and uploaded.");
+            response.text().then(text => {
+                console.log(`Server Response: ${text}`);
+            });
+        }
+        else
+        {
+            throw `Serverside Error when uploading file: ${response}`;
+        }
+    }).catch(err => {
+        throw `Error when uploading file: ${err}`;
+    });
 }
 
 /**
