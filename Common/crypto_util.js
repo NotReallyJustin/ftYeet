@@ -16,11 +16,13 @@ import {
     scryptSync,
     createCipheriv,
     createDecipheriv,
-    constants
+    constants,
+    createPublicKey
 } from 'node:crypto';
 
 export { supportedCiphers, supportedAsymmetrics, secureKeyGen, zeroBuffer, symmetricDecrypt, symmetricEncrypt, secureSign, secureVerify, compatPrivKE, compatPubKE, genKeyPair, 
-    keyEncodingFormats, keyEncodingTypes, supportedHashes, genHMAC, fromFileSyntaxAsymm, toFileSyntaxAsymm, fromFileSyntaxSymm, toFileSyntaxSymm, genAsymmCryptosystem }
+    keyEncodingFormats, keyEncodingTypes, supportedHashes, genHMAC, fromFileSyntaxAsymm, toFileSyntaxAsymm, fromFileSyntaxSymm, toFileSyntaxSymm, genAsymmCryptosystem,
+    pubKeyType, base64ToPubKey, pubKeyToBase64 }
 
 /**
  * List of supported Ciphers. See `planning.md` if you're curious.
@@ -759,6 +761,129 @@ const fromFileSyntaxAsymm = (dsaKey, fileBuffer) => {
     };
 }
 
+/**
+ * Determines the format of the public key (`der`, `jwk`, or `pem`).
+ * @param {String} str String to check for the public key type of
+ * @param {boolean} inBase64 Whether the string is in base64. Usually, this is set to true if you're transmitting a public key over the web.
+ * @return {String} `der-spki`, `der-pkcs1`, `jwk`, `pem`, or `none`.
+ */
+const pubKeyType = (str, inBase64) => {
+
+    const formats = ['der-spki', 'der-pkcs1', 'jwk', 'pem'];
+
+    if (inBase64)
+    {
+        str = Buffer.from(str, 'base64');
+    }
+
+    // Test every one of the formats in a loop
+    for (var format of formats)
+    {
+        try
+        {
+            if (format == 'der-spki')
+            {
+                createPublicKey({
+                    key: base64ToPubKey(str, 'der'),
+                    encoding: 'utf-8',
+                    format: 'der',
+                    type: 'spki'
+                });
+            }
+            else if (format == 'der-pkcs1')
+            {
+                createPublicKey({
+                    key: base64ToPubKey(str, 'der'),
+                    encoding: 'utf-8',
+                    format: 'der',
+                    type: 'pkcs1'
+                });
+            }
+            else
+            {
+                createPublicKey({
+                    key: base64ToPubKey(str, format),
+                    encoding: 'utf-8',
+                    format: format
+                });
+            }
+
+            return format;
+        }
+        catch(err)
+        {
+            continue;
+        }
+    }
+
+    return 'none';
+}
+
+/**
+ * If your public key is in base64, this function will convert them back into the appropriate public key format.
+ * Before you invoke this, you might want to run `pubkeyType()`.
+ * @param {String} b64 Base 64 string 
+ * @param {String} format Desired key output format. Must be `der`, `pem`, or `jwk`.
+ * @throws Error if `format` is not a valid/supported key encoding format
+ * @returns {Buffer|String|JSON} The public key
+ */
+const base64ToPubKey = (b64, format) => {
+    if (!keyEncodingFormats.includes(format))
+    {
+        throw `Error when converting public key from base64: ${format} is not a valid key encoding format.`;
+    }
+
+    if (format == 'der')
+    {
+        return Buffer.from(b64, 'base64');
+    }
+
+    if (format == 'pem')
+    {
+        return Buffer.from(b64, 'base64').toString('utf-8');
+    }
+
+    if (format == 'jwk')
+    {
+        return JSON.parse(Buffer.from(b64, 'base64').toString('utf-8'));
+    }
+
+    throw `Error when converting public key from base64: ${format} is not a valid key encoding format.`;
+}
+
+/**
+ * Converts a public key to base64.
+ * Before you invoke this, you might want to run `pubkeyType()` if you don't know your key format.
+ * @param {Object} pubKey The public key in its particular format
+ * @param {String} format Key input format. Must be `der`, `pem`, or `jwk`.
+ * @throws Error if `format` is not a valid/supported key encoding format
+ * @returns {String} Base64 string of your public key. You can transmit this across the internet.
+ */
+const pubKeyToBase64 = (pubKey, format) => {
+
+    if (!keyEncodingFormats.includes(format))
+    {
+        throw `Error when converting public key to base64: ${format} is not a valid key encoding format.`;
+    }
+    
+    if (format == 'der')
+    {
+        return pubKey.toString('base64');
+    }
+
+    if (format == 'pem')
+    {
+        return Buffer.from(pubKey, 'utf-8').toString('base64');
+    }
+
+    if (format == 'jwk')
+    {
+        return Buffer.from(JSON.stringify(pubKey), 'utf-8').toString('base64');
+    }
+
+    throw `Error when converting public key to base64: ${format} is not a valid key encoding format.`;
+}
+
 // 🛠️ Testing area 
 // const encAlg = 'aes-256-gcm'
 // let symmEnc = symmetricEncrypt("49ers", "San Francisco", "That's looking Purdy good... except for Moody. He's making me Moody.", encAlg, 12);
@@ -775,7 +900,10 @@ const fromFileSyntaxAsymm = (dsaKey, fileBuffer) => {
 // 🛠️ DEMO for asymm.
 // let keyPair = genKeyPair('rsa', {
 //     modulusLength: 4096,
-//     publicKeyEncoding: compatPubKE,
+//     publicKeyEncoding: {
+//         type: 'spki',
+//         format: 'jwk'
+//     },
 //     privateKeyEncoding: {
 //         type: 'pkcs8',
 //         format: 'pem',
@@ -783,6 +911,8 @@ const fromFileSyntaxAsymm = (dsaKey, fileBuffer) => {
 //         passphrase: 'CMC'
 //     }
 // });
+
+// console.log(pubKeyType(pubKeyToBase64(keyPair.publicKey, 'jwk'), true))
 
 // let encrypted = publicEncrypt({key: keyPair.publicKey, oaepHash: 'sha3-512', padding: constants.RSA_PKCS1_OAEP_PADDING}, Buffer.from("Touchdown San Francisco!", 'utf-8'));
 // let decrypted = privateDecrypt({key: keyPair.privateKey, oaepHash: 'sha3-512', padding: constants.RSA_PKCS1_OAEP_PADDING, passphrase: 'CMC'}, encrypted);

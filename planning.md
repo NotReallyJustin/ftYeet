@@ -181,16 +181,33 @@ For hashes, we'll use `sha3-512`. `sha2` is probably secure enough, but I had to
     * Also HTTPS is arguably more secure than me trying to parse `base64` encodings of binary files, public keys, etc.
     * Also this means we only need to worry about 1 application on 1 port which is kind of nice 😃
     * Also because the upload will have a lot of arguments so it's easier to manage 
-* Upload:
+* **Uploading public keys** ✅
+    * Turns out HTTP really does not like CRLF characters... but public keys love them!
+    * To bypass this, we're encoding public keys in `base64`
+    * This isn't meant to "encrypt" them or to make them more secure; it's a formatting thing
+    * I mean public keys aren't meant to be kept secret regardless. Also if you're still paranoid, this whole thing is running over TLS so 🤷‍♂️
+* **Upload Asymm**:
 ```
-POST: https://api.ftyeet.something/upload
-    --> fileSyntax
-    --> file
-    --> expireTime
-    --> burnOnRead
-    --> publicKey (if needed)
+POST: https://api.ftyeet.something/uploadAsymm
+    --> fileSyntax in Body
+    --> file-name
+    --> expire-time
+    --> burn-on-read
+    --> public-key (if needed)
         * Server will store public key used to encrypt the file
         * HOWEVER - the server can't spoof anything because there's a digital signature - and the server doesn't have the private key used to sign stuff
+    <-- URL
+```
+
+* **Upload Symm**
+```
+POST: https://api.ftyeet.something/upload
+    --> fileSyntax in Body
+    --> file-name
+    --> expire-time
+    --> burn-on-read
+    --> pwd-hash
+    <-- URL
 ```
 
 * **Download Asymm:**
