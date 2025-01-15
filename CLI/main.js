@@ -99,7 +99,7 @@ program
     .requiredOption('-f, --file <path>', 'path of the file to upload')
     .option('-a, --algorithm [chacha20-poly1305|aes-256-gcm|aes256-cbc]', 'symmetric algorithm for encrypting the file', 'chacha20-poly1305')
     .option('-c, --auth-code [password]', 'authentication code used to generate file HMAC; password would be used if this is left empty')
-    .option('-t, --expire-time [seconds]', 'how long the server should hold on to the uploaded file; must be >= 60', forceNum, 300)
+    .option('-t, --expire-time [seconds]', 'how long the server should hold on to the uploaded file; must be >= 60', forceNum, 60)
     .option('-b, --burn', 'whether to burn the file upon download', false)
     .action((options) => {
         functions.uploadSymm(options.file, options.password, options.algorithm, options.authCode != undefined ? options.authCode : options.password, 
@@ -129,14 +129,15 @@ program
     .requiredOption('-f, --file <path>', 'path of the file to upload')
     .requiredOption('-e, --encryption-key <path>', 'path of key file used to encrypt your file; usually, this is the recipient\'s public key')
     .requiredOption('-s, --signature-key <path>', 'path of key file used to digitally sign your encrypted file; usually, this is your private key')
-    .option('-o, --encryption-key-pwd [password]', 'password for your encryption key file, if you have one')
     .option('-p, --signature-key-pwd [password]', 'password for your signature key file, if you have one')
     .option('-r, --signature-padding [RSA_PKCS1_PSS_PADDING|RSA_PKCS1_PADDING]', 'padding for digital signature (if RSA)', 'RSA_PKCS1_PSS_PADDING')
-    .option('-t, --encryption-padding [RSA_PKCS1_PSS_PADDING|RSA_PKCS1_OAEP_PADDING]', 'padding for RSA asymmetric encryption; if you choose OAEP Padding,' +
+    .option('-c, --encryption-padding [RSA_PKCS1_PSS_PADDING|RSA_PKCS1_OAEP_PADDING]', 'padding for RSA asymmetric encryption; if you choose OAEP Padding,' +
         ' the hash is SHA3-512', 'RSA_PKCS1_OAEP_PADDING')
+    .option('-t, --expire-time [seconds]', 'how long the server should hold on to the uploaded file; must be >= 60', forceNum, 60)
+    .option('-b, --burn', 'whether to burn the file upon download', false)
     .action((options) => {
-        functions.uploadAsymm(options.file, options.signatureKey, options.signatureKeyPwd, options.encryptionKey, options.encryptionKeyPwd, 
-            options.signaturePadding, options.encryptionPadding);
+        functions.uploadAsymm(options.file, options.signatureKey, options.signatureKeyPwd, options.encryptionKey, 
+            options.signaturePadding, options.encryptionPadding, options.expireTime, options.burn);
     })
 ;
 

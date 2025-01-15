@@ -817,12 +817,7 @@ const fromFileSyntaxAsymm = (dsaKey, fileBuffer) => {
  */
 const pubKeyType = (str, inBase64) => {
 
-    const formats = ['der-spki', 'der-pkcs1', 'jwk', 'pem'];
-
-    if (inBase64)
-    {
-        str = Buffer.from(str, 'base64');
-    }
+    const formats = ['pem', 'der-spki', 'der-pkcs1', 'jwk'];
 
     // Test every one of the formats in a loop
     for (var format of formats)
@@ -832,7 +827,7 @@ const pubKeyType = (str, inBase64) => {
             if (format == 'der-spki')
             {
                 createPublicKey({
-                    key: base64ToPubKey(str, 'der'),
+                    key: inBase64 ? base64ToPubKey(str, 'der') : str,
                     encoding: 'utf-8',
                     format: 'der',
                     type: 'spki'
@@ -841,7 +836,7 @@ const pubKeyType = (str, inBase64) => {
             else if (format == 'der-pkcs1')
             {
                 createPublicKey({
-                    key: base64ToPubKey(str, 'der'),
+                    key: inBase64 ? base64ToPubKey(str, 'der') : str,
                     encoding: 'utf-8',
                     format: 'der',
                     type: 'pkcs1'
@@ -850,7 +845,7 @@ const pubKeyType = (str, inBase64) => {
             else
             {
                 createPublicKey({
-                    key: base64ToPubKey(str, format),
+                    key: inBase64 ? base64ToPubKey(str, format) : str,
                     encoding: 'utf-8',
                     format: format
                 });
@@ -860,6 +855,7 @@ const pubKeyType = (str, inBase64) => {
         }
         catch(err)
         {
+            console.error(err)
             continue;
         }
     }

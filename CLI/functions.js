@@ -247,13 +247,19 @@ function downloadSymm(dirPath, password, encAlg, authCode, url, fileSyntax)
  * @param {String} signKeyPath Key file for signing file
  * @param {String|undefined} signKeyPwd Password to decrypt `signKeyPath`, if any.
  * @param {String} encKeyPath Key file for encrypting file
- * @param {String|undefined} encKeyPwd Password fo decrypt `signKeyFile`, if any.
  * @param {String} dsaPadding Padding for signing algorithm. Must be `RSA_PKCS1_PSS_PADDING` or `RSA_PKCS1_PADDING`.
  * @param {String} encPadding Padding for encryption algorithm. Must be `RSA_PKCS1_OAEP_PADDING` or `RSA_PKCS1_PADDING`.
+ * @param {Number} expireTime How long should the ftYeet server hold on to your file (in seconds). Must be `>= 60`.
+ * @param {Boolean} burnOnRead Whether ftYeet should delete the file immediately upon download
  * @futureParam {String} oaepHash OAEP hashing algorithm to use. Must be in the list of supported hashes. Might toggle it on in the future but for security I might lock them into SHA3-512.
  */
-function uploadAsymm(filePath, signKeyPath, signKeyPwd, encKeyPath, encKeyPwd, dsaPadding, encPadding)
+function uploadAsymm(filePath, signKeyPath, signKeyPwd, encKeyPath, dsaPadding, encPadding, expireTime, burnOnRead)
 {
+    if (expireTime < 60)
+    {
+        throw `Error when uploading file: expire-time must be longer than 60 seconds.`;
+    }
+    
     if (!fileUtil.exists(filePath))
     {
         throw `Error when uploading file: ${filePath} does not exist.`;
@@ -338,6 +344,12 @@ function uploadAsymm(filePath, signKeyPath, signKeyPwd, encKeyPath, encKeyPwd, d
         throw `Error when uploading file: Failed to read key file ${encKeyPath}. ${err}`; 
     }
 
+    let encKeyType = cryptoUtil.pubKeyType(encKey, false);
+    if (encKeyType == 'none')
+    {
+        throw `Error when uploading file: ${encKeyPath} is not a public key.`; 
+    }
+
     let plaintext;
     try
     {
@@ -354,7 +366,7 @@ function uploadAsymm(filePath, signKeyPath, signKeyPwd, encKeyPath, encKeyPwd, d
     {
         // If they pass in a private key, it's fine too because Node.js specs can derive a public key from a private key so the results stay the same.
         // But hopefully, the end user knows how asymmetric encryption works. Which they should if they're running this CLI command.
-        let encrypted = publicEncrypt({key: encKey, passphrase: encKeyPwd, oaepHash: 'sha3-512', padding: encPadding}, plaintext);
+        let encrypted = publicEncrypt({key: encKey, oaepHash: 'sha3-512', padding: encPadding}, plaintext);
         let signature = cryptoUtil.secureSign('sha3-512', encrypted, {key: signKey, passphrase: signKeyPwd, padding: dsaPadding});
         let cryptosystem = cryptoUtil.genAsymmCryptosystem(signature, dsaPadding, encPadding, 'sha3-512');
         fileSyntax = cryptoUtil.toFileSyntaxAsymm(cryptosystem, encrypted, {key: signKey, passphrase: signKeyPwd}, 'CLI');
@@ -364,9 +376,37 @@ function uploadAsymm(filePath, signKeyPath, signKeyPwd, encKeyPath, encKeyPwd, d
         throw `Error when uploading file: Failed to encrypt file. ${err}`;
     }
 
-    console.dir(fileSyntax)
-    //test
-    writeFileSync('./bye.txt', fileSyntax);
+    // Send fetch request to website
+    fetch(`${HTTPS_TUNNEL}/uploadAsymm`, {
+        method: 'POST',
+        headers: {
+            // TODO Maybe encrypt this as well
+            "file-name": basename(filePath),
+            "expire-time": expireTime,
+            "burn-on-read": burnOnRead,
+            "public-key": cryptoUtil.pubKeyToBase64(encKey, encKeyType),
+            "Content-Type": "application/octet-stream"
+        },
+        body: fileSyntax,
+        follow: 1,
+        agent: IGNORE_SSL_AGENT
+    }).then((response) => {
+        if (response.ok)
+        {
+            console.log("File successfully encrypted and uploaded.");
+            response.text().then(text => {
+                console.log(`Server Response: ${text}`);
+            });
+        }
+        else
+        {
+            response.text().then(err => {
+                console.error(err);
+            });
+        }
+    }).catch(err => {
+        console.error(`Error when uploading file: ${err}`);
+    });
 }
 
 /**

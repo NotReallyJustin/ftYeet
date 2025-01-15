@@ -47,6 +47,8 @@ mainServer.use("*", (request, response, next) => {
     console.log(`Request Type: ${request.method}`);
     console.log(`Request Host: ${request.hostname}`);
     console.log(`Request Path: ${request.originalUrl}`)
+    console.dir(`DEBUG - Request Headers:`)
+    console.dir(request.headers)
     console.log("--------------------------------------------------------------------");
     console.log("");
 

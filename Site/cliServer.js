@@ -39,6 +39,11 @@ apiRouter.post("/upload", (request, response) => {
         else
         {
             expireTime = parseInt(request.headers['expire-time']);
+
+            if (expireTime < 60)
+            {
+                return response.status(400).send("Error when uploading: expire-time must be greater than or equal to 60 seconds.");
+            }
         }
     }
 
@@ -90,6 +95,11 @@ apiRouter.post("/uploadAsymm", (request, response) => {
         else
         {
             expireTime = parseInt(request.headers['expire-time']);
+
+            if (expireTime < 60)
+            {
+                return response.status(400).send("Error when uploading: expire-time must be greater than or equal to 60 seconds.");
+            }
         }
     }
 
@@ -113,7 +123,7 @@ apiRouter.post("/uploadAsymm", (request, response) => {
     {
         return response.status(400).send("Error when uploading: You must provide a public-key. This should be done for you via the CLI.");
     }
-    else if (pubKeyType(request.headers['public-key']) == 'none')
+    else if (pubKeyType(request.headers['public-key'], true) == 'none') // pubkey still in b64 btw
     {
         return response.status(400).send("Error when uploading: The public-key you provided is invalid. It's probably not a public key.");
     }
