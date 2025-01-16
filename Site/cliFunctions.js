@@ -1,4 +1,5 @@
 import * as https from 'https';
+import { writeFileSync } from 'fs';
 export { genURL }
 
 /**
@@ -25,3 +26,7 @@ const genURL = () => new Promise((resolve, reject) => {
         reject(`Issue when fetching random word: ${err.message}.`);
     });
 });
+
+const secureWrite = () => {
+    
+}

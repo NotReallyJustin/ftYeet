@@ -51,11 +51,12 @@ God I love this language <br>
 * Zero out the memory if possible bc memory forensics is scary (tbf if they get this far we're already cooked but still confidentiality >>> here)
 
 ## Private Key Signing/Encryption serverside
-* Do not give FtYeet permission to private key file (`chmod` such that `FtYeet` doesn't have perms to view this at all)
-* Create a new privileged user with access to private key file
-* User will serve as key vault (encrypt, decrypt, sign, etc.)
-* IPC --> Maybe pipes if they could work; but prolly will just use an internal socket
-* HTTPS Private Key != Actual private key used to encrypt/sign
+* ~~Do not give FtYeet permission to private key file (`chmod` such that `FtYeet` doesn't have perms to view this at all)~~
+* ~~Create a new privileged user with access to private key file~~
+* ~~User will serve as key vault (encrypt, decrypt, sign, etc.)~~
+* ~~IPC --> Maybe pipes if they could work; but prolly will just use an internal socket~~
+* ~~HTTPS Private Key != Actual private key used to encrypt/sign~~
+* See **Docker** section below.
 * Second thought: Azure Key Vault but that'll require us trusting Azure (also it costs a bit more $$$ but it is an option)
 
 ## More on Symmetric Encryption + Key Generation
@@ -268,9 +269,19 @@ GET: https://api.ftyeet.something/download
 
 ## File System Security
 * Disable execution on all files
-* Potentially containerize/hide stuff in a seperate "virtual file system" to isolate from main file system
-* --> not too sure how to do that; but if `Hadoop` fs could pull something like that together so can we
+* ~~Potentially containerize/hide stuff in a seperate "virtual file system" to isolate from main file system~~
+* ~~--> not too sure how to do that; but if `Hadoop` fs could pull something like that together so can we~~
+* ^^ Decided against this: If you can upload files, you can download files. If you can download files, you can probably run them.
+* `"You don't get hacked by files. You get hacked by *processes*"` - guy from BSides
 * Track total size
+
+## Containerization
+* Docker - not because it's trendy but because I really don't want someone to upload and then execute a script that modifies `/etc/shadow` or smth
+* Follow <a href="https://cheatsheetseries.owasp.org/cheatsheets/Docker_Security_Cheat_Sheet.html#:~:text=Docker%20is%20the%20most%20popular,directly%20on%20the%20host%20system.">this</a>
+* We're going to use two containers to isolate the encryption/private key signing process from the ftYeet server
+    * Kinda mad I didn't think of this earlier lol
+    * Can't access the private key files directly if they're basically on two different file systems (well... different volumes)
+* Use a bridge network driver 🙂 This acts as a firewall! Only the two containers can talk to each other
 
 ## Future Plans
 * Prevent bots from abusing file upload (we only have so much space)
