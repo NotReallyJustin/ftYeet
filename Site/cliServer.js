@@ -7,6 +7,24 @@
 
 import * as express from 'express';
 import { pubKeyType, base64ToPubKey } from '../Common/crypto_util.js';
+import * as cliFunctions from './cliFunctions.js';
+
+// ⚒️ Helper functions and constants
+const MAX_FILE_SIZE = '2mb';
+
+/**
+ * Middleware that checks the content type of incoming requests.
+ * If the content-type doesn't match, send back a 404 error.
+ * @param {String} contentType The content type we want. THIS IS CASE SENSITIVE!!!
+ */
+const checkContentType = (contentType) => (request, response, next) => {
+    if (request.headers['content-type'] != contentType)
+    {
+        return response.status(400).send(`Error: Wrong content-type. Expected ${contentType} but received ${request.headers['content-type']}.`);
+    }
+
+    next();
+}
 
 const apiRouter = express.Router({
     mergeParams: true               // Keep req.params from parent router
@@ -14,6 +32,9 @@ const apiRouter = express.Router({
 
 // ⚠️ Check `/planning.md` for answers about the weird design choices here
 // TLDR: this "API" is only here to tunnel the ftYeet protocol under HTTPS. People should be interacting with this via the CLI.
+
+apiRouter.use("/upload", checkContentType('application/octet-stream'));
+apiRouter.use("/upload", express.raw({limit: MAX_FILE_SIZE, type: 'application/octet-stream'}));
 apiRouter.post("/upload", (request, response) => {
     
     // Variables because I have a feeling that headers are going to be strings
@@ -21,11 +42,6 @@ apiRouter.post("/upload", (request, response) => {
     let burnOnRead;
     
     // Check headers
-    if (request.headers['file-name'] == undefined)
-    {
-        return response.status(400).send("Error when uploading: You must provide a file-name.");
-    }
-
     if (request.headers['expire-time'] == undefined)
     {
         return response.status(400).send("Error when uploading: You must provide an expire-time for the file.");
@@ -68,9 +84,16 @@ apiRouter.post("/upload", (request, response) => {
         return response.status(400).send("Error when uploading: You must provide a pwd-hash (password hash). This should be done for you via the CLI.");
     }
 
-    response.send("This is the CLI Server. You are uploading.");
+    cliFunctions.uploadSymm(request.body, expireTime, burnOnRead, request.headers['pwd-hash'])
+        .then(() => {
+            response.send("Done!");
+        }).catch(err => {
+            response.status(404).send(`Error when uploading: ${err}.`);
+        })
 });
 
+apiRouter.use("/uploadAsymm", checkContentType('application/octet-stream'));
+apiRouter.use("/uploadAsymm", express.raw({limit: MAX_FILE_SIZE, type: 'application/octet-stream'}));
 apiRouter.post("/uploadAsymm", (request, response) => {
 
     let expireTime;

@@ -1,5 +1,7 @@
 // To declutter main.js, this handles all the important CLI functions
 // Justin notation: () => {} if there's no side effects. function() {} if there is.
+
+// 🔊 Note to self when you get back: Work on fixing base64 decrypt over in the server to support jwk and der
 import * as cryptoUtil from '../Common/crypto_util.js';
 import * as fileUtil from '../Common/file_util.js';
 import fetch from 'node-fetch';
@@ -91,8 +93,8 @@ function keygen(pubkeyPath, privkeyPath, encryptAlg, options)
 
     try
     {
-        writeFileSync(pubkeyPath, keyPair.publicKey);
-        writeFileSync(privkeyPath, keyPair.privateKey);
+        writeFileSync(pubkeyPath, keyPair.publicKey, {encoding: 'binary'});
+        writeFileSync(privkeyPath, keyPair.privateKey, {encoding: 'binary'});
     }
     catch(err)
     {
@@ -147,8 +149,9 @@ function uploadSymm(filePath, password, encAlg, authCode, expireTime, burnOnRead
         throw `Error when uploading file: Failed to read file ${filePath}. ${err};`;
     }
     
-    // Symmetrically encrypt and HMAC file
-    let symmEnc = cryptoUtil.symmetricEncrypt(password, authCode, plaintext, encAlg, encAlg == 'aes-256-cbc' ? 16 : 12);
+    // Symmetrically encrypt and HMAC the file path and name (using the file construct structure we came up with)
+    let fileConstruct = cryptoUtil.toFileConstruct(basename(filePath), plaintext);
+    let symmEnc = cryptoUtil.symmetricEncrypt(password, authCode, Buffer.from(fileConstruct, 'utf-8'), encAlg, encAlg == 'aes-256-cbc' ? 16 : 12);
     
     let ciphertext = symmEnc.ciphertext;
     delete symmEnc.ciphertext;
@@ -161,11 +164,10 @@ function uploadSymm(filePath, password, encAlg, authCode, expireTime, burnOnRead
     fetch(`${HTTPS_TUNNEL}/upload`, {
         method: 'POST',
         headers: {
-            // TODO Maybe encrypt this as well
-            "file-name": basename(filePath),
             "expire-time": expireTime,
             "burn-on-read": burnOnRead,
-            "pwd-hash": cryptoUtil.genPwdHash(password, 64)
+            "pwd-hash": cryptoUtil.genPwdHash(password, 64),
+            "Content-Type": "application/octet-stream"
         },
         body: fileSyntax,
         follow: 1,
@@ -180,7 +182,9 @@ function uploadSymm(filePath, password, encAlg, authCode, expireTime, burnOnRead
         }
         else
         {
-            throw `Serverside Error when uploading file: ${response}`;
+            response.text().then(err => {
+                console.error(err);
+            });
         }
     }).catch(err => {
         throw `Error when uploading file: ${err}`;
@@ -237,8 +241,19 @@ function downloadSymm(dirPath, password, encAlg, authCode, url, fileSyntax)
         throw `Error when downloading file: Failed to decrypt file. \n${err}`;
     }
 
+    // Un-File construct while checking for invalid file names (path traversals go brrr)
+    let unFileConstruct;
+    try
+    {
+        unFileConstruct = cryptoUtil.fromFileConstruct(plaintext.toString('utf-8'));
+    }
+    catch(err)
+    {
+        throw `Error when downloading file: Someone might have tampered with your file. \n${err}`;
+    }
+
     // Write to file
-    writeFileSync(`${dirPath}/test_output.txt`, plaintext);
+    writeFileSync(`${dirPath}/${unFileConstruct.fileName}`, unFileConstruct.fileContent);
 }
 
 /**
@@ -323,21 +338,31 @@ function uploadAsymm(filePath, signKeyPath, signKeyPwd, encKeyPath, dsaPadding, 
         throw `Error when uploading file: Padding for signing algorithm ${dsaPadding.toUpperCase()} is not supported.`; 
     }
 
-    // Read keys
+    // Read keys and generate KeyObjects in case it isn't in .pem
     let signKey;
     try
     {
-        signKey = readFileSync(signKeyPath, {encoding: 'utf-8'});
+        signKey = readFileSync(signKeyPath, {encoding: 'binary'});
     }
     catch(err)
     {
-        throw `Error when uploading file: Failed to read key file ${signKeyPath}. ${err}`; 
+        throw `Error when uploading file: ${err}`; 
+    }
+
+    let signKeyObject;
+    try
+    {
+        signKeyObject = cryptoUtil.genPrivKeyObject(signKey, signKeyPwd, true);
+    }
+    catch(err)
+    {
+        throw `Error when uploading file: ${err}`; 
     }
 
     let encKey;
     try
     {
-        encKey = readFileSync(encKeyPath, {encoding: 'utf-8'});
+        encKey = readFileSync(encKeyPath, {encoding: 'binary'});
     }
     catch(err)
     {
@@ -348,6 +373,16 @@ function uploadAsymm(filePath, signKeyPath, signKeyPwd, encKeyPath, dsaPadding, 
     if (encKeyType == 'none')
     {
         throw `Error when uploading file: ${encKeyPath} is not a public key.`; 
+    }
+
+    let encKeyObject;
+    try
+    {
+        encKeyObject = cryptoUtil.genPubKeyObject(encKey, 'binary');
+    }
+    catch(err)
+    {
+        throw `Error when uploading file: ${err}`; 
     }
 
     let plaintext;
@@ -366,10 +401,13 @@ function uploadAsymm(filePath, signKeyPath, signKeyPwd, encKeyPath, dsaPadding, 
     {
         // If they pass in a private key, it's fine too because Node.js specs can derive a public key from a private key so the results stay the same.
         // But hopefully, the end user knows how asymmetric encryption works. Which they should if they're running this CLI command.
-        let encrypted = publicEncrypt({key: encKey, oaepHash: 'sha3-512', padding: encPadding}, plaintext);
-        let signature = cryptoUtil.secureSign('sha3-512', encrypted, {key: signKey, passphrase: signKeyPwd, padding: dsaPadding});
+
+        let fileConstruct = cryptoUtil.toFileConstruct(basename(filePath), Buffer.from(plaintext, 'utf-8'));
+        let encrypted = publicEncrypt({key: encKeyObject, oaepHash: 'sha3-512', padding: encPadding}, fileConstruct);
+        let signature = cryptoUtil.secureSign('sha3-512', encrypted, {key: signKeyObject, passphrase: signKeyPwd, padding: dsaPadding});
+
         let cryptosystem = cryptoUtil.genAsymmCryptosystem(signature, dsaPadding, encPadding, 'sha3-512');
-        fileSyntax = cryptoUtil.toFileSyntaxAsymm(cryptosystem, encrypted, {key: signKey, passphrase: signKeyPwd}, 'CLI');
+        fileSyntax = cryptoUtil.toFileSyntaxAsymm(cryptosystem, encrypted, {key: signKeyObject, passphrase: signKeyPwd}, 'CLI');
     }
     catch(err)
     {
@@ -380,11 +418,9 @@ function uploadAsymm(filePath, signKeyPath, signKeyPwd, encKeyPath, dsaPadding, 
     fetch(`${HTTPS_TUNNEL}/uploadAsymm`, {
         method: 'POST',
         headers: {
-            // TODO Maybe encrypt this as well
-            "file-name": basename(filePath),
             "expire-time": expireTime,
             "burn-on-read": burnOnRead,
-            "public-key": cryptoUtil.pubKeyToBase64(encKey, encKeyType),
+            "public-key": cryptoUtil.keyToBase64(encKey, encKeyType),
             "Content-Type": "application/octet-stream"
         },
         body: fileSyntax,
@@ -463,31 +499,52 @@ function downloadAsymm(dirPath, url, verifyKeyPath, verifyKeyPwd, decKeyPath, de
         throw `Error when downloading file: Can't read Key file ${verifyKeyPath}.`;
     }
         
-    // Read keys
+    // Read keys and generate key objects
     let verifyKey;
     try
     {
-        verifyKey = readFileSync(verifyKeyPath, {encoding: 'utf-8'});
+        verifyKey = readFileSync(verifyKeyPath, {encoding: 'binary'});
     }
     catch(err)
     {
         throw `Error when uploading file: Failed to read key file ${verifyKeyPath}. ${err}`; 
     }
 
+    let verifyKeyObject;
+    try
+    {
+        verifyKeyObject = cryptoUtil.genPubKeyObject(verifyKey, 'binary');
+    }
+    catch(err)
+    {
+        throw `Error when uploading file: ${err}`; 
+    }
+
     let decKey;
     try
     {
-        decKey = readFileSync(decKeyPath, {encoding: 'utf-8'});
+        decKey = readFileSync(decKeyPath, {encoding: 'binary'});
     }
     catch(err)
     {
         throw `Error when uploading file: Failed to read key file ${decKeyPath}. ${err}`; 
     }
 
+    let decKeyObject;
+    try
+    {
+        decKeyObject = cryptoUtil.genPrivKeyObject(decKey, true);
+    }
+    catch(err)
+    {
+        throw `Error when uploading file: ${err}`; 
+    }
+
     // Fetch file syntax
-    let restored = cryptoUtil.fromFileSyntaxAsymm({key: verifyKey, passphrase: verifyKeyPwd}, fileSyntax);
-    let plaintext = privateDecrypt({key: decKey, oaepHash: restored.cryptoSystem.oaepHash, padding: restored.cryptoSystem.encryptPadding, passphrase: decKeyPwd}, restored.data);
+    let restored = cryptoUtil.fromFileSyntaxAsymm({key: verifyKeyObject, passphrase: verifyKeyPwd}, fileSyntax);
+    let plaintext = privateDecrypt({key: decKeyObject, oaepHash: restored.cryptoSystem.oaepHash, padding: restored.cryptoSystem.encryptPadding, passphrase: decKeyPwd}, restored.data);
+    let unFileConstruct = cryptoUtil.fromFileConstruct(plaintext.toString('utf-8'));
 
     // Write to file
-    writeFileSync(`${dirPath}/test_output.txt`, plaintext);
+    writeFileSync(`${dirPath}/${unFileConstruct.fileName}`, unFileConstruct.fileContent);
 }

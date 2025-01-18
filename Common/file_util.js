@@ -10,7 +10,7 @@ import {
     chmodSync
 } from 'node:fs';
 
-export { isFile, isDir, getFileSize, exists, hasPerms, canRead, canWrite, canExecute, chmod }
+export { isFile, isDir, getFileSize, exists, hasPerms, canRead, canWrite, canExecute, chmod, verifyFileName }
 /**
  * Checks if a file path is actually a file
  * @param {String} path The path to check
@@ -164,3 +164,10 @@ function chmod(path, permissionMode)
 
     return true;
 }
+
+/**
+ * Verifies a file name to ensure it doesn't contain / \ .. : * ? < > | &. Also make sure it's less than 30 characters.
+ * @param {String} fileName File Name to verify
+ * @returns {Boolean} Whether or not the file name is valid.
+ */
+const verifyFileName = (fileName) => fileName.length <= 30 && !/(\\|\/|\.\.|:|\*|\?|<|>|\||&)/mi.test(fileName);

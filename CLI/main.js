@@ -35,7 +35,7 @@ program
     .requiredOption('-u, --public-key-path <path>', 'public key file path')
     .requiredOption('-v, --private-key-path <path>', 'private key file path')
     .option('-e, --pubkey-encoding-type [pkcs1|spki]', 'encoding type for public key', 'spki')
-    .option('-f, --privkey-encoding-type [pkcs1|pkcs8|spki]', 'encoding type for private key', 'pkcs8')
+    .option('-f, --privkey-encoding-type [pkcs1|pkcs8]', 'encoding type for private key', 'pkcs8')
     .option('-g, --encoding-format [pem|der|jwk]', 'encoding format for keys', 'pem')
     .option('-l, --modulus-length [number]', 'modulus length in bits (required for RSA and DSA)', parseInt, 4096)
     .option('-p, --public-exponent [number]', 'exponent for RSA; defaults to 0x10001', parseInt, 0x1001)

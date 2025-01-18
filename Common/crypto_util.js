@@ -17,12 +17,21 @@ import {
     createCipheriv,
     createDecipheriv,
     constants,
-    createPublicKey
+    createPublicKey,
+    createPrivateKey,
+    KeyObject
 } from 'node:crypto';
 
 export { supportedCiphers, supportedAsymmetrics, secureKeyGen, zeroBuffer, symmetricDecrypt, symmetricEncrypt, secureSign, secureVerify, compatPrivKE, compatPubKE, genKeyPair, 
     keyEncodingFormats, keyEncodingTypes, supportedHashes, genHMAC, fromFileSyntaxAsymm, toFileSyntaxAsymm, fromFileSyntaxSymm, toFileSyntaxSymm, genAsymmCryptosystem,
-    pubKeyType, base64ToPubKey, pubKeyToBase64, genPwdHash, verifyPwdHash }
+    pubKeyType, base64ToPubKey, keyToBase64, genPwdHash, verifyPwdHash, fromFileConstruct, toFileConstruct, genPrivKeyObject, genPubKeyObject }
+
+/**
+ * Verifies a file name to ensure it doesn't contain / \ .. : * ? < > | &. Also make sure it's less than 30 characters.
+ * @param {String} fileName File Name to verify
+ * @returns {Boolean} Whether or not the file name is valid.
+ */
+const verifyFileName = (fileName) => fileName.length <= 30 && !/(\\|\/|\.\.|:|\*|\?|<|>|\||&)/mi.test(fileName);
 
 /**
  * List of supported Ciphers. See `planning.md` if you're curious.
@@ -313,7 +322,7 @@ const keyEncodingTypes = ['pkcs1', 'pkcs8', 'spki'];
  * @param {String} options.publicKeyEncoding Encoding for public key. We recommend using compatPubKE for max compatibility
  * @param {String} options.privateKeyEncoding Encoding for private key. We recommend using compatPrivKE for max compatibility
  * @see https://nodejs.org/api/crypto.html#cryptogeneratekeypairsynctype-options
- * @returns {{publicKey: String, privateKey: String}} JSON of public and private key in the format specified by `publicKeyEncoding` and `privateKeyEncoding` (strings for `compat*KE`)
+ * @returns JSON of public and private key in the format specified by `publicKeyEncoding` and `privateKeyEncoding` (strings for `compat*KE`)
  */
 const genKeyPair = (encryptAlg, options) => {
 
@@ -367,11 +376,11 @@ const secureSign = (hashAlg, data, signKeyObject) => {
         throw "Please provide a key to sign.";
     }
 
-    if (signKeyObject.key.includes("ENCRYPTED") && signKeyObject.passphrase == undefined)
-    {
-        throw "It seems like your (presumably private) key is encrypted. Please provide a passphrase.";
-    }
-
+    // if (signKeyObject.key.includes("ENCRYPTED") && signKeyObject.passphrase == undefined)
+    // {
+    //     throw "It seems like your (presumably private) key is encrypted. Please provide a passphrase.";
+    // }
+    
     let signature;              // Buffer
     try                         // If we can, force sha3-512 or the hashAlg. If the algorithm is uncompromising with its hashes (like ED25519), let it cook.
     {
@@ -420,10 +429,10 @@ const secureVerify = (hashAlg, data, verifyKeyObject, signature) => {
         throw "Please provide a key to sign.";
     }
 
-    if (verifyKeyObject.key.includes("ENCRYPTED") && verifyKeyObject.passphrase == undefined)
-    {
-        throw "It seems like your key is encrypted. Please provide a passphrase.";
-    }
+    // if (verifyKeyObject.key.includes("ENCRYPTED") && verifyKeyObject.passphrase == undefined)
+    // {
+    //     throw "It seems like your key is encrypted. Please provide a passphrase.";
+    // }
 
     let signatureBuffer = Buffer.from(signature, 'hex');        // Buffer
 
@@ -436,13 +445,13 @@ const secureVerify = (hashAlg, data, verifyKeyObject, signature) => {
     {
         try
         {
-            console.log("We got an internal issue with `Node.js` itself when trying to sign the data. This might be an ED25519 key. Trying workaround...");
+            console.log("We got an internal issue with `Node.js` itself when trying to verify the data. This might be an ED25519 key. Trying workaround...");
             console.log("Note: ED25519 uses SHA2-512 internally.")
             signatureValid = verify(null, data, verifyKeyObject, signatureBuffer);
         }
         catch(err2)
         {
-            throw `Error when signing: ${err2}.\n Usually this occurs because of a wrong passphrase when decrypting the private key.`;
+            throw `Error when verifying: ${err2}.\n Usually this occurs because of a wrong passphrase when decrypting the private key. ${err2.stack}`;
         }
     }
     
@@ -811,11 +820,12 @@ const fromFileSyntaxAsymm = (dsaKey, fileBuffer) => {
 
 /**
  * Determines the format of the public key (`der`, `jwk`, or `pem`).
- * @param {String} str String to check for the public key type of
- * @param {boolean} inBase64 Whether the string is in base64. Usually, this is set to true if you're transmitting a public key over the web.
+ * By default, this checks BINARY BUFFERS. 
+ * @param {String|Buffer} pubKey Public Key to check the type of. It's a buffer by default UNLESS you explicitly set `inBase64` to `true`.
+ * @param {boolean} inBase64 Whether the public key is in base64. Usually, this is set to true if you're transmitting a public key over the web.
  * @return {String} `der-spki`, `der-pkcs1`, `jwk`, `pem`, or `none`.
  */
-const pubKeyType = (str, inBase64) => {
+const pubKeyType = (pubKey, inBase64) => {
 
     const formats = ['pem', 'der-spki', 'der-pkcs1', 'jwk'];
 
@@ -827,7 +837,7 @@ const pubKeyType = (str, inBase64) => {
             if (format == 'der-spki')
             {
                 createPublicKey({
-                    key: inBase64 ? base64ToPubKey(str, 'der') : str,
+                    key: inBase64 ? base64ToPubKey(pubKey, 'der') : binToKey(pubKey, 'der'),
                     encoding: 'utf-8',
                     format: 'der',
                     type: 'spki'
@@ -836,7 +846,7 @@ const pubKeyType = (str, inBase64) => {
             else if (format == 'der-pkcs1')
             {
                 createPublicKey({
-                    key: inBase64 ? base64ToPubKey(str, 'der') : str,
+                    key: inBase64 ? base64ToPubKey(pubKey, 'der') : binToKey(pubKey, 'der'),
                     encoding: 'utf-8',
                     format: 'der',
                     type: 'pkcs1'
@@ -845,7 +855,7 @@ const pubKeyType = (str, inBase64) => {
             else
             {
                 createPublicKey({
-                    key: inBase64 ? base64ToPubKey(str, format) : str,
+                    key: inBase64 ? base64ToPubKey(pubKey, format) : binToKey(pubKey, format),
                     encoding: 'utf-8',
                     format: format
                 });
@@ -855,12 +865,127 @@ const pubKeyType = (str, inBase64) => {
         }
         catch(err)
         {
-            console.error(err)
             continue;
         }
     }
 
     return 'none';
+}
+
+/**
+ * Given ANY public key, regardless of format, return a `KeyObject` that we can work with.
+ * This function exists because HOLYYYYY FUCK Node.js is stupid when it comes to anything that's not a `.pem` key
+ * @param {String|Buffer|JSON} pubKey ANY public key. Make sure to specify the `encoding`
+ * @param {String} encoding Specify how the public key is encoded. This could be `default` (usually happens when you directly use the key generated by Node.js), `base64` (usually happens when you read the key from the internet), or `binary` (usually happens when you read the key from a file)
+ * @throws Errors if we exhausted all public key object combinations and still couldn't give you a Public Key Object
+ * @return {KeyObject} A keyObject you can encrypt, decrypt, sign, or verify with. Basically the holy grail of Node.js crypto.
+ */
+const genPubKeyObject = (pubKey, encoding) => {
+
+    if (!['base64', 'default', 'binary'].includes(encoding))
+    {
+        throw "Unable to generate public key object: Your encoding is invalid.";
+    }
+
+    var inBase64 = encoding == 'base64';
+    var inBinary = encoding == 'binary';
+    
+    const formats = ['pem', 'der-spki', 'der-pkcs1', 'jwk'];
+
+    // Test every one of the formats in a loop
+    for (var format of formats)
+    {
+        try
+        {
+            if (format == 'der-spki')
+            {
+                return createPublicKey({
+                    key: inBase64 ? base64ToPubKey(pubKey, 'der') : (inBinary ? binToKey(pubKey, 'der') : pubKey),
+                    encoding: 'utf-8', 
+                    format: 'der',
+                    type: 'spki'
+                });
+            }
+            else if (format == 'der-pkcs1')
+            {
+                return createPublicKey({
+                    key: inBase64 ? base64ToPubKey(pubKey, 'der') : (inBinary ? binToKey(pubKey, 'der') : pubKey),
+                    encoding: 'utf-8',
+                    format: 'der',
+                    type: 'pkcs1'
+                });
+            }
+            else
+            {
+                return createPublicKey({
+                    key: inBase64 ? base64ToPubKey(pubKey, format) : (inBinary ? binToKey(pubKey, format) : pubKey),
+                    encoding: 'utf-8',  // Doesn't do anything, but `encoding` just tells them that if they see a string, parse it as utf-8. 
+                    format: format      // If it's not a string, this gets ignored.
+                });
+            }
+        }
+        catch(err)
+        {
+            continue;
+        }
+    }
+
+    throw "Unable to generate public key object: Exhausted all possible combinations; your public key probably isn't valid.";
+}
+
+/**
+ * Given ANY private key, regardless of encoding or format, return a KeyObject that we can work with.
+ * @param {Buffer|String|JSON} privateKey ANY private key. If it is a binary, make sure to set `inBinary` to `true`
+ * @param {String} password Your private key password, if there is one
+ * @param {Boolean} inBinary Whether your private key is encoded in binary. This usually happens when you're reading it in from a file.
+ * @throws Errors if we exhausted all private key object combinations and still couldn't give you a Private Key Object
+ * @return {KeyObject} A keyObject you can encrypt, decrypt, sign, or verify with. Basically the holy grail of Node.js crypto.
+ */
+const genPrivKeyObject = (privateKey, password, inBinary) => {
+    const formats = ['pem', 'der-pkcs8', 'der-pkcs1', 'jwk'];
+
+    // Test every one of the formats in a loop
+    for (var format of formats)
+    {
+        try
+        {
+            if (format == 'der-pkcs8')
+            {
+                return createPrivateKey({
+                    key: inBinary ? binToKey(privateKey, 'der') : privateKey,
+                    encoding: 'utf-8',          // Kinda useless ngl; only used by Node.js when the key is a string
+                    format: 'der',
+                    type: 'pkcs8',
+                    passphrase: password
+                });
+            }
+            else if (format == 'der-pkcs1')
+            {
+                return createPrivateKey({
+                    key: inBinary ? binToKey(privateKey, 'der') : privateKey,
+                    encoding: 'utf-8',
+                    format: 'der',
+                    type: 'pkcs1',
+                    passphrase: password
+                });
+            }
+            else
+            {
+                return createPrivateKey({
+                    key: inBinary ? binToKey(privateKey, format) : privateKey,
+                    encoding: 'utf-8',
+                    format: format,
+                    passphrase: password
+                });
+            }
+        }
+        catch(err)
+        {
+            continue;
+        }
+    }
+
+    throw "Unable to generate private key object: Exhausted all possible combinations. Either your private key wasn't valid or you had an invalid password.";
 }
 
 /**
@@ -896,14 +1021,70 @@ const base64ToPubKey = (b64, format) => {
 }
 
 /**
- * Converts a public key to base64.
- * Before you invoke this, you might want to run `pubkeyType()` if you don't know your key format.
- * @param {Object} pubKey The public key in its particular format
+ * If your key is in binary, this function will convert them back into the appropriate public key format.
+ * Before you invoke this, you might want to run `pubkeyType()`.
+ * @param {String} bin The key, in binary. Usually this happens when you're reading it in from a file
+ * @param {String} format Desired key output format. Must be `der`, `pem`, or `jwk`.
+ * @throws Error if `format` is not a valid/supported key encoding format
+ * @returns {Buffer|String|JSON} The public key
+ */
+const binToKey = (bin, format) => {
+
+    if (!keyEncodingFormats.includes(format))
+    {
+        throw `Error when converting to key: ${format} is not a valid key encoding format.`
+    }
+
+    if (format == 'der')
+    {
+        return bin;
+    }
+    else if (format == 'jwk')
+    {
+        return JSON.parse(bin.toString('utf-8'));
+    }
+    else
+    {
+        return bin.toString('utf-8');
+    }
+}
+
+/**
+ * Converts a key to a binary buffer. This usually happens when you're trying to write to a binary file.
+ * @param {Buffer|String|JSON} key The key to convert into binary
+ * @param {String} format Desired key input format. Must be `der`, `pem`, or `jwk`.
+ * @returns {Buffer} The binary buffer containing the key. You are responsible for zeroing this.
+ */
+const keyToBin = (key, format) => {
+
+    if (!keyEncodingFormats.includes(format))
+    {
+        throw `Error when converting to binary buffer: ${format} is not a valid key encoding format.`
+    }
+
+    if (format == 'der')
+    {
+        return key;
+    }
+    else if (format == 'jwk')
+    {
+        return Buffer.from(JSON.stringify(key), 'utf-8');
+    }
+    else
+    {
+        return Buffer.from(key, 'utf-8');
+    }
+}
+
+/**
+ * Converts a key to base64.
+ * Before you invoke this, you might want to run `pubKeyType()` or `privKeyType()` if you don't know your key format.
+ * @param {Object} key The public key in its particular format
  * @param {String} format Key input format. Must be `der`, `pem`, or `jwk`.
  * @throws Error if `format` is not a valid/supported key encoding format
  * @returns {String} Base64 string of your public key. You can transmit this across the internet.
  */
-const pubKeyToBase64 = (pubKey, format) => {
+const keyToBase64 = (key, format) => {
 
     if (!keyEncodingFormats.includes(format))
     {
@@ -912,34 +1093,78 @@ const pubKeyToBase64 = (pubKey, format) => {
     
     if (format == 'der')
     {
-        return pubKey.toString('base64');
+        return key.toString('base64');
     }
 
     if (format == 'pem')
     {
-        return Buffer.from(pubKey, 'utf-8').toString('base64');
+        return Buffer.from(key, 'utf-8').toString('base64');
     }
 
     if (format == 'jwk')
     {
-        return Buffer.from(JSON.stringify(pubKey), 'utf-8').toString('base64');
+        return Buffer.from(JSON.stringify(key), 'utf-8').toString('base64');
     }
 
     throw `Error when converting public key to base64: ${format} is not a valid key encoding format.`;
 }
 
+/**
+ * Creates a file construct. The format of this is `[file name in hex - up to 30 chars/bytes]:[file contents in hex]`.
+ * When this is done, you could encrypt the whole thing
+ * @param {String} fileName The name of the file. Must not contain `/ \ .. : * ? < > | &`
+ * @param {Buffer} fileContent The contents of the file. If it's important to you, you should zero this out yourself.
+ * @throws Errors if the file name is invalid
+ * @returns {String} File construct. `[file name in hex - up to 30 chars/bytes]:[file contents in hex]`.
+ */
+const toFileConstruct = (fileName, fileContent) => {
+    
+    if (!verifyFileName(fileName))
+    {
+        throw "Unable to convert to file construct: The file name is invalid. Make sure it's less than 30 characters and that it doesn't contain invalid chars like : ? < > / ";
+    }
+
+    return `${Buffer.from(fileName, 'utf-8').toString('hex')}:${fileContent.toString('hex')}`;
+}
+
+/**
+ * Converts a file construct into a JSON with the file name and the file contents (as a buffer)/
+ * Recall a file construct is `[file name in hex - up to 30 chars/bytes]:[file contents in hex]`.
+ * @param {String} fileConstruct `[file name in hex - up to 30 chars/bytes]:[file contents in hex]`.
+ * @thros Errors if the file name is invalid
+ * @returns {{fileName: String, fileContent: Buffer}} A JSON with the file name and the file content
+ */
+const fromFileConstruct = (fileConstruct) => {
+
+    const deconstructed = {
+        fileName: Buffer.from(fileConstruct.substring(0, fileConstruct.indexOf(":")), 'hex').toString('utf-8'),
+        fileContent: Buffer.from(fileConstruct.substring(fileConstruct.indexOf(":") + 1), 'hex')
+    };
+
+    if (!verifyFileName(deconstructed.fileName))
+    {
+        throw "Unable to convert from file construct: The file name is invalid. Make sure it's less than 30 characters and that it doesn't contain invalid chars like : ? < > / ";
+    }
+
+    return deconstructed;
+}
+
 // 🛠️ Testing area 
 // const encAlg = 'aes-256-gcm'
-// let symmEnc = symmetricEncrypt("49ers", "San Francisco", "That's looking Purdy good... except for Moody. He's making me Moody.", encAlg, 12);
+// let fileConstruct = toFileConstruct("JoshAllen.md", Buffer.from("That's looking Purdy good... except for Moody. He's making me Moody.", 'utf-8'));
+// let symmEnc = symmetricEncrypt("49ers", "San Francisco", Buffer.from(fileConstruct, 'utf-8'), encAlg, 12);
 // // symmEnc.encAuthTag = 'c3047f19c8588dca270ec3a0719076ff'
 // // let symmDec = symmetricDecrypt("49ers", "San Francisco", symmEnc.ciphertext, encAlg, symmEnc);
 
 // let ciphertext = symmEnc.ciphertext;
 // delete symmEnc.ciphertext;
 // let fileSyntax = toFileSyntaxSymm(symmEnc, ciphertext, secureKeyGen("San Francisco", 32, symmEnc.hmacSalt), 'CLI');
-// console.dir(fileSyntax)
 // let restored = fromFileSyntaxSymm(undefined, "San Francisco", fileSyntax);
-// console.dir(restored);
+
+// let symmDec = symmetricDecrypt("49ers", "San Francisco", restored.data, encAlg, restored.cryptoSystem);
+// let unFileConstruct = fromFileConstruct(symmDec.toString('utf-8'));
+// console.dir(unFileConstruct.fileName)
+// console.dir(unFileConstruct.fileContent.toString('utf-8'));
 
 // 🛠️ DEMO for asymm.
 // let keyPair = genKeyPair('rsa', {
@@ -950,24 +1175,33 @@ const pubKeyToBase64 = (pubKey, format) => {
 //     },
 //     privateKeyEncoding: {
 //         type: 'pkcs8',
-//         format: 'pem',
+//         format: 'jwk',
 //         cipher: 'aes-256-cbc',
 //         passphrase: 'CMC'
 //     }
 // });
 
-// console.log(pubKeyType(pubKeyToBase64(keyPair.publicKey, 'jwk'), true))
+// // This is to emulate reading from a file
+// let pubKeyInput = keyToBin(keyPair.publicKey, 'jwk');           // You know the encoding format when you create the key
+// let pubKey = genPubKeyObject(pubKeyInput, 'binary');
 
-// let encrypted = publicEncrypt({key: keyPair.publicKey, oaepHash: 'sha3-512', padding: constants.RSA_PKCS1_OAEP_PADDING}, Buffer.from("Touchdown San Francisco!", 'utf-8'));
-// let decrypted = privateDecrypt({key: keyPair.privateKey, oaepHash: 'sha3-512', padding: constants.RSA_PKCS1_OAEP_PADDING, passphrase: 'CMC'}, encrypted);
+// let privKeyInput = keyToBin(keyPair.privateKey, 'jwk');
+// let privKey = genPrivKeyObject(privKeyInput, "CMC", true);
 
-// let signature = secureSign('sha3-512', encrypted, {key: keyPair.privateKey, passphrase: 'CMC', padding: constants.RSA_PKCS1_PSS_PADDING});
+// let fileConstruct = toFileConstruct("JoshAllen.md", Buffer.from("Touchdown San Francisco!", 'utf-8'));
+// let encrypted = publicEncrypt({key: pubKey, oaepHash: 'sha3-512', padding: constants.RSA_PKCS1_OAEP_PADDING}, Buffer.from(fileConstruct, 'utf-8'));
+// // let decrypted = privateDecrypt({key: keyPair.privateKey, oaepHash: 'sha3-512', padding: constants.RSA_PKCS1_OAEP_PADDING, passphrase: 'CMC'}, encrypted);
+
+// let signature = secureSign('sha3-512', encrypted, {key: privKey, passphrase: 'CMC', padding: constants.RSA_PKCS1_PSS_PADDING});
 // // console.log(signature.length)
 // // let isValid = secureVerify('sha3-512', Buffer.from("hello", "ascii"), {key: keyPair.publicKey, padding: constants.RSA_PKCS1_PSS_PADDING}, signature);
 
 // let cryptosystem = genAsymmCryptosystem(signature, constants.RSA_PKCS1_PSS_PADDING, constants.RSA_PKCS1_OAEP_PADDING, 'sha3-512');
-// let fileSyntax = toFileSyntaxAsymm(cryptosystem, encrypted, {key: keyPair.privateKey, passphrase: 'CMC'}, 'CLI');
-// let restored = fromFileSyntaxAsymm({key: keyPair.publicKey}, fileSyntax);
-// console.log(restored)
+// let fileSyntax = toFileSyntaxAsymm(cryptosystem, encrypted, {key: privKey, passphrase: 'CMC'}, 'CLI');
+// let restored = fromFileSyntaxAsymm({key:pubKey}, fileSyntax);
 
-// console.log(privateDecrypt({key: keyPair.privateKey, oaepHash: restored.cryptoSystem.oaepHash, padding: restored.cryptoSystem.encryptPadding, passphrase: 'CMC'}, restored.data).toString())
+// let decrypted = privateDecrypt({key: privKey, oaepHash: restored.cryptoSystem.oaepHash, padding: restored.cryptoSystem.encryptPadding}, restored.data);
+// let unFileConstruct = fromFileConstruct(decrypted.toString('utf-8'));
+
+// console.log(unFileConstruct.fileName);
+// console.log(unFileConstruct.fileContent.toString('utf-8'));
