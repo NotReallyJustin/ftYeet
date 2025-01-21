@@ -100,11 +100,6 @@ apiRouter.post("/uploadAsymm", (request, response) => {
     let burnOnRead;
     
     // Check headers
-    if (request.headers['file-name'] == undefined)
-    {
-        return response.status(400).send("Error when uploading: You must provide a file-name.");
-    }
-
     if (request.headers['expire-time'] == undefined)
     {
         return response.status(400).send("Error when uploading: You must provide an expire-time for the file.");
@@ -162,6 +157,21 @@ apiRouter.get("/download", (request, response) => {
     response.send("This is the CLI Server. You are downloading symm.");
 });
 
+// // Middleware to handle errors
+// mainServer.use((err, request, response, next) => {
+
+//     // Errors we explicitly threw:
+//     if (err.status === 413)
+//     {
+//         response.status(413).send(`Request body is too large. The maximum allowed size is ${MAX_FILE_SIZE}.`);
+    
+//     }
+//     else
+//     {
+//         console.log(`Error when handling main server routing: ${err}`);
+//         response.status(500).send("Oops - we ran into an internal server error.");
+//     }
+// });
 
 apiRouter.all("*", (request, response) => {
     response.status(404).send("Not found.");

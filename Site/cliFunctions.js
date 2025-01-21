@@ -2,6 +2,8 @@ import * as https from 'https';
 import { writeFile, chmod } from 'fs';
 import * as cryptoUtil from '../Common/crypto_util.js';
 import * as path from 'path';
+import * as fileUtil from '../Common/file_util.js';
+import { randomBytes } from 'crypto';
 export { genURL, uploadSymm }
 
 // ⭐ Formatting note: I use () => {} if there's no side effects. function() {} is used when there is a side effect
@@ -53,7 +55,7 @@ function uploadSymm(data, expireTime, burnOnRead, pwdHash)
     let encryptedData = cryptoUtil.toFileSyntaxSymm(symmEnc, ciphertext, cryptoUtil.secureKeyGen(TEMP_PWD, 32, symmEnc.hmacSalt), 'Server');
 
     return new Promise((resolve, reject) => {
-        secureWrite(fileName, encryptedData)
+        secureWrite(encryptedData)
             .then(newFilePath => {
                 // Write to database
                 // Auto delete process start
@@ -68,7 +70,7 @@ function uploadSymm(data, expireTime, burnOnRead, pwdHash)
 
 /**
  * Validates the file name (to prevent fiddling with paths), encrypts the file name if it is, disables execution for everyone, and writes the binary data to a file.
- * The new file name will be a randomly generated 128-byte hex (max file name size)
+ * The new file name will be a randomly generated 64-byte hex (max file name size)
  * @param {Buffer} data The binary data to write to the file. ⭐ This data will be encrypted again via file syntax. ⭐
  * @returns {Promise<String>} Promise resolves with the [new] encrypted file path
  */
@@ -76,13 +78,19 @@ function secureWrite(data)
 {
     return new Promise((resolve, reject) => {
 
-        // Generate a random, unique file name that's 128 bytes
-        let fileName = 'TODO';
+        // Generate a random, unique file name that's 64 bytes
+        let newFilePath;
+        
+        // TODO: Once we get the database up, don't use the exist function. Just make a db query instead. It's much faster
+        while (newFilePath == undefined || fileUtil.exists(newFilePath))
+        {
+            let fileName = randomBytes(64).toString('hex');
+            newFilePath = path.resolve(FILE_DIR, fileName);
+        }
 
         // Normally, you would check the dir you're writing to to prevent path traversal, but we alr mitigated that with the re-encoding + docker container
         // Also checking dir you're writing to doesn't make any sense because this is going to be in a docker container with its own virtual fs
-        let newFilePath = path.resolve(FILE_DIR, fileName);
-        writeFile("./0040000000c7c8e678b087115c160c15072bd3a92a4c76fe1c147f7c3eae4bc99ece", data, (err) => {
+        writeFile(newFilePath, data, (err) => {
             if (err)
             {
                 console.error(`Error in secureWrite: ${err}.`);
@@ -91,16 +99,15 @@ function secureWrite(data)
             else
             {
                 // 600 - Only this "user" can read and write to file
-                chmod(newFilePath, 0o600, (err) => {
-                    if (err)
-                    {
-                        reject(err);
-                    }
-                    else
-                    {
-                        resolve(newFilePath);
-                    }
-                });
+                let status = fileUtil.chmod(newFilePath, 0o600);
+                if (status)
+                {
+                    resolve(newFilePath);
+                }
+                else
+                {
+                    reject();
+                }
             }
         }); 
     });

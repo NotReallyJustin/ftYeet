@@ -90,11 +90,16 @@ function keygen(pubkeyPath, privkeyPath, encryptAlg, options)
 
     // Generate keypairs + write them to files
     let keyPair = cryptoUtil.genKeyPair(encryptAlg, options);
+    let pubKeyBuff = cryptoUtil.keyToBin(keyPair.publicKey, options.publicKeyEncoding.format);
+    let privkeyBuff = cryptoUtil.keyToBin(keyPair.privateKey, options.privateKeyEncoding.format);
 
     try
     {
-        writeFileSync(pubkeyPath, keyPair.publicKey, {encoding: 'binary'});
-        writeFileSync(privkeyPath, keyPair.privateKey, {encoding: 'binary'});
+        writeFileSync(pubkeyPath, pubKeyBuff, {encoding: 'binary'});
+        writeFileSync(privkeyPath, privkeyBuff, {encoding: 'binary'});
+
+        cryptoUtil.zeroBuffer(pubKeyBuff);
+        cryptoUtil.zeroBuffer(privkeyBuff);
     }
     catch(err)
     {
@@ -339,10 +344,12 @@ function uploadAsymm(filePath, signKeyPath, signKeyPwd, encKeyPath, dsaPadding, 
     }
 
     // Read keys and generate KeyObjects in case it isn't in .pem
+    // 😠 Warning to future Justin: Do not specify an encoding if you want `fs.readFileSync()` to return a buffer
+    // That stuff's for old Node.js (when Buffers didn't exist)
     let signKey;
     try
     {
-        signKey = readFileSync(signKeyPath, {encoding: 'binary'});
+        signKey = readFileSync(signKeyPath);
     }
     catch(err)
     {
@@ -362,7 +369,7 @@ function uploadAsymm(filePath, signKeyPath, signKeyPwd, encKeyPath, dsaPadding, 
     let encKey;
     try
     {
-        encKey = readFileSync(encKeyPath, {encoding: 'binary'});
+        encKey = readFileSync(encKeyPath);
     }
     catch(err)
     {
@@ -373,6 +380,13 @@ function uploadAsymm(filePath, signKeyPath, signKeyPwd, encKeyPath, dsaPadding, 
     if (encKeyType == 'none')
     {
         throw `Error when uploading file: ${encKeyPath} is not a public key.`; 
+    }
+
+        // Adjust encKeyType to get rid of -spki or -pkcs1
+        // Hardcoding bc minimal user input good for security
+    if (encKeyType == 'der-spki' || encKeyType == 'der-pkcs1')
+    {
+        encKeyType = 'der';
     }
 
     let encKeyObject;

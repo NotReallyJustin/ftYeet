@@ -24,7 +24,8 @@ import {
 
 export { supportedCiphers, supportedAsymmetrics, secureKeyGen, zeroBuffer, symmetricDecrypt, symmetricEncrypt, secureSign, secureVerify, compatPrivKE, compatPubKE, genKeyPair, 
     keyEncodingFormats, keyEncodingTypes, supportedHashes, genHMAC, fromFileSyntaxAsymm, toFileSyntaxAsymm, fromFileSyntaxSymm, toFileSyntaxSymm, genAsymmCryptosystem,
-    pubKeyType, base64ToPubKey, keyToBase64, genPwdHash, verifyPwdHash, fromFileConstruct, toFileConstruct, genPrivKeyObject, genPubKeyObject }
+    pubKeyType, base64ToPubKey, keyToBase64, genPwdHash, verifyPwdHash, fromFileConstruct, toFileConstruct, genPrivKeyObject, genPubKeyObject,
+    keyToBin }
 
 /**
  * Verifies a file name to ensure it doesn't contain / \ .. : * ? < > | &. Also make sure it's less than 30 characters.
@@ -106,7 +107,7 @@ const secureKeyGen = (password, length, salt) => {
 
 /**
  * Hashes a password. This uses scrypt instead of a normal hashing function to make it more resistant to brute forcing.
- * The SALT is randomized.
+ * The SALT is randomized. Check this with `verifyPwdHash()`
  * @param {String} pwd The password string to hash
  * @param {Number} length The size of the resulting hash (in bytes). We recommend making this >= 32 bytes.
  * @see `secureKeyGen()`
@@ -1171,7 +1172,7 @@ const fromFileConstruct = (fileConstruct) => {
 //     modulusLength: 4096,
 //     publicKeyEncoding: {
 //         type: 'spki',
-//         format: 'jwk'
+//         format: 'der'
 //     },
 //     privateKeyEncoding: {
 //         type: 'pkcs8',
@@ -1182,7 +1183,7 @@ const fromFileConstruct = (fileConstruct) => {
 // });
 
 // // This is to emulate reading from a file
-// let pubKeyInput = keyToBin(keyPair.publicKey, 'jwk');           // You know the encoding format when you create the key
+// let pubKeyInput = keyToBin(keyPair.publicKey, 'der');           // You know the encoding format when you create the key
 // let pubKey = genPubKeyObject(pubKeyInput, 'binary');
 
 // let privKeyInput = keyToBin(keyPair.privateKey, 'jwk');
