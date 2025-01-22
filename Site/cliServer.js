@@ -35,6 +35,17 @@ const apiRouter = express.Router({
 
 apiRouter.use("/upload", checkContentType('application/octet-stream'));
 apiRouter.use("/upload", express.raw({limit: MAX_FILE_SIZE, type: 'application/octet-stream'}));
+
+apiRouter.get("/request", (request, response) => {
+    cliFunctions.genURL()
+        .then(word => {
+            return response.send(word);
+        }).catch(err => {
+            console.error(err);
+            return response.status(400).send("Error: Unable to request a word for the URL.");
+        })
+});
+
 apiRouter.post("/upload", (request, response) => {
     
     // Variables because I have a feeling that headers are going to be strings
@@ -84,9 +95,15 @@ apiRouter.post("/upload", (request, response) => {
         return response.status(400).send("Error when uploading: You must provide a pwd-hash (password hash). This should be done for you via the CLI.");
     }
 
+    if (request.headers['url'] == undefined || !cliFunctions.checkURL(request.headers['url']) 
+        || request.headers['url'].length < 4 || request.headers['url'].length > 10)
+    {
+        return response.status(400).send("Error when uploading: You must provide a valid URL. Make sure you're using the CLI and not tampering with stuff on your own.")
+    }
+
     cliFunctions.uploadSymm(request.body, expireTime, burnOnRead, request.headers['pwd-hash'])
         .then(() => {
-            response.send("Done!");
+            response.send(request.headers['url']);
         }).catch(err => {
             response.status(404).send(`Error when uploading: ${err}.`);
         })
@@ -150,10 +167,27 @@ apiRouter.post("/uploadAsymm", (request, response) => {
 });
 
 apiRouter.get("/downloadAsymm", (request, response) => {
+    if (request.headers['jwt'] == undefined)
+    {
+        return response.status(400).send("Error when downloading: You must provide a valid JWT token signed with your private key. This should be done via the CLI.");
+    }
+
     response.send("This is the CLI Server. You are downloading asymm.");
 });
 
 apiRouter.get("/download", (request, response) => {
+
+    if (request.headers['url'] == undefined || !cliFunctions.checkURL(request.headers['url']) 
+        || request.headers['url'].length < 4 || request.headers['url'].length > 10)
+    {
+        return response.status(400).send("Error when downloading: You must provide a valid URL. Make sure you're using the CLI and not tampering with stuff on your own.")
+    }
+
+    if (request.headers['pwd-hash'] == undefined)
+    {
+        return response.status(400).send("Error when uploading: You must provide a pwd-hash (password hash). This should be done for you via the CLI.");
+    }
+
     response.send("This is the CLI Server. You are downloading symm.");
 });
 

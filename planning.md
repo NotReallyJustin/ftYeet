@@ -208,7 +208,16 @@ POST: https://api.ftyeet.something/upload
     --> expire-time
     --> burn-on-read
     --> pwd-hash
-    <-- URL
+    --> URL (proposed URL, see "Request" section)
+    <-- URL confirmed
+```
+
+* **Request**
+* If we're going to be sending password hashes over the internet and hashing it *again*, we need for both end users to know the same SALT to use for hashing the `pwd-hash`. But lowkey I don't trust the end user to do that properly so we're salting with the randomly generated URL
+* The user will request a random, uniquely generated URL word here and use it for both the URL to eventually access the resource *AND* for `pwd-hash`.
+```
+GET: https://api.ftyeet.something/request
+    <-- Unique word for URL
 ```
 
 * **Download Asymm:**
@@ -238,6 +247,7 @@ GET: https://api.ftyeet.something/downloadAsymm
 * Alternative Download Asymm idea that might clean a lot of stuff up:
 ```
 GET: https://api.ftyeet.something/downloadAsymm
+    --> URL
     --> Pass in JWT token of URL, timestamp, IP, and nonce - signed w/ end user's private key
         * Restrict it to RS512 or smth
         * Server verifies JWT token signature using public key on file
@@ -248,8 +258,9 @@ GET: https://api.ftyeet.something/downloadAsymm
 * **Download Symm**
 ```
 GET: https://api.ftyeet.something/download
-    --> URL, Hash(Hash(password))
-        * Server will compare it by hashing Hash(password)
+    --> URL
+    --> Hash(Hash(password, Hash(URL)), Hash(URL))
+        * Server will compare it by hashing Hash(password, Hash(URL))
     <-- Encrypted file *OR* Error
 ```
 * Even if someone managed to bypass the auth process by exploiting the JWT token somehow, they still have to deal with E2EE

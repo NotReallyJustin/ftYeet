@@ -143,52 +143,76 @@ function uploadSymm(filePath, password, encAlg, authCode, expireTime, burnOnRead
         throw `Error when uploading file: ${encAlg} is not a supported encryption algorithm.`;
     }
 
-    // Read file contents as buffer
-    let plaintext;
-    try
-    {
-        plaintext = readFileSync(filePath)
-    }
-    catch(err)
-    {
-        throw `Error when uploading file: Failed to read file ${filePath}. ${err};`;
-    }
-    
-    // Symmetrically encrypt and HMAC the file path and name (using the file construct structure we came up with)
-    let fileConstruct = cryptoUtil.toFileConstruct(basename(filePath), plaintext);
-    let symmEnc = cryptoUtil.symmetricEncrypt(password, authCode, Buffer.from(fileConstruct, 'utf-8'), encAlg, encAlg == 'aes-256-cbc' ? 16 : 12);
-    
-    let ciphertext = symmEnc.ciphertext;
-    delete symmEnc.ciphertext;
-
-    // Convert to file syntax
-    let hmacCryptosys = cryptoUtil.secureKeyGen(authCode, 32, symmEnc.hmacSalt);
-    let fileSyntax = cryptoUtil.toFileSyntaxSymm(symmEnc, ciphertext, hmacCryptosys, 'CLI');
-    
-    // Send fetch request to website
-    fetch(`${HTTPS_TUNNEL}/upload`, {
-        method: 'POST',
-        headers: {
-            "expire-time": expireTime,
-            "burn-on-read": burnOnRead,
-            "pwd-hash": cryptoUtil.genPwdHash(password, 64),
-            "Content-Type": "application/octet-stream"
-        },
-        body: fileSyntax,
+    // First, fetch a word
+    fetch(`${HTTPS_TUNNEL}/request`, {
+        method: 'GET',
         follow: 1,
         agent: IGNORE_SSL_AGENT
     }).then((response) => {
         if (response.ok)
         {
-            console.log("File successfully encrypted and uploaded.");
-            response.text().then(text => {
-                console.log(`Server Response: ${text}`);
+            response.text().then(salt => {
+                // Read file contents as buffer
+                let plaintext;
+                try
+                {
+                    plaintext = readFileSync(filePath)
+                }
+                catch(err)
+                {
+                    throw `Error when uploading file: Failed to read file ${filePath}. ${err};`;
+                }
+                
+                // Symmetrically encrypt and HMAC the file path and name (using the file construct structure we came up with)
+                let fileConstruct = cryptoUtil.toFileConstruct(basename(filePath), plaintext);
+                let symmEnc = cryptoUtil.symmetricEncrypt(password, authCode, Buffer.from(fileConstruct, 'utf-8'), encAlg, encAlg == 'aes-256-cbc' ? 16 : 12);
+                
+                let ciphertext = symmEnc.ciphertext;
+                delete symmEnc.ciphertext;
+
+                // Convert to file syntax
+                let hmacCryptosys = cryptoUtil.secureKeyGen(authCode, 32, symmEnc.hmacSalt);
+                let fileSyntax = cryptoUtil.toFileSyntaxSymm(symmEnc, ciphertext, hmacCryptosys, 'CLI');
+                
+                // Generate SALT to hash password with --> This is the hash of the URL
+                let urlHash = cryptoUtil.genHash(salt, 'sha3-256');
+
+                // Send fetch request to website
+                fetch(`${HTTPS_TUNNEL}/upload`, {
+                    method: 'POST',
+                    headers: {
+                        "expire-time": expireTime,
+                        "burn-on-read": burnOnRead,
+                        "pwd-hash": cryptoUtil.genPwdHash(password, 64, urlHash),
+                        "Content-Type": "application/octet-stream",
+                        "url": salt
+                    },
+                    body: fileSyntax,
+                    follow: 1,
+                    agent: IGNORE_SSL_AGENT
+                }).then((response2) => {
+                    if (response2.ok)
+                    {
+                        console.log("File successfully encrypted and uploaded.");
+                        response2.text().then(text => {
+                            console.log(`Your file can be accessed here with this URL: ${text}. Pass it into the download function.`);
+                        });
+                    }
+                    else
+                    {
+                        response2.text().then(err => {
+                            throw err;
+                        });
+                    }
+                }).catch(err => {
+                    throw `Error when uploading file: ${err}`;
+                });
             });
         }
         else
         {
             response.text().then(err => {
-                console.error(err);
+                throw err;
             });
         }
     }).catch(err => {
@@ -228,7 +252,39 @@ function downloadSymm(dirPath, password, encAlg, authCode, url, fileSyntax)
         throw `Error when downloading file: ${encAlg} is not a supported encryption algorithm. It probably isn't the cipher used to encrypt the file you're downloading.`;
     }
 
+    // Process SALT --> This is the hash of the URL
+    let urlHash = cryptoUtil.genHash(url, 'sha3-256');
+
     //Download file from ftYeet
+    fetch(`${HTTPS_TUNNEL}/download`, {
+        method: 'GET',
+        headers: {
+            "url": url,
+            "pwd-hash": cryptoUtil.genPwdHash(password, 64, urlHash),
+            "Content-Type": "application/octet-stream"
+        },
+        body: fileSyntax,
+        follow: 1,
+        agent: IGNORE_SSL_AGENT
+    }).then((response) => {
+        if (response.ok)
+        {
+            response.text().then(response => {
+                console.log(response);
+            });
+        }
+        else
+        {
+            response.text().then(err => {
+                throw `Error when downloading file: ${err}`;
+            });
+        }
+    }).catch(err => {
+        throw `Error when downloading file: ${err}`;
+    });
+
+    // 🔨 To work on later once serverside is good
+    return;
 
     // Clientside decryption
     // First, parse file syntax

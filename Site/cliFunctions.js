@@ -4,7 +4,7 @@ import * as cryptoUtil from '../Common/crypto_util.js';
 import * as path from 'path';
 import * as fileUtil from '../Common/file_util.js';
 import { randomBytes } from 'crypto';
-export { genURL, uploadSymm }
+export { genURL, uploadSymm, checkURL }
 
 // ⭐ Formatting note: I use () => {} if there's no side effects. function() {} is used when there is a side effect
 
@@ -18,23 +18,46 @@ const FILE_DIR = "./";
  */
 const genURL = () => new Promise((resolve, reject) => {
     //TODO once we have db: Check to ensure that we don't have overlap
-    var wordLen = Math.floor(Math.random() * 3) + 5;
+    var wordLen = Math.floor(Math.random() * 4) + 7;
     let word = "";
-    https.get(`https://random-word-api.herokuapp.com/word?length=${wordLen}`, response => {
-        
-        response.on('data', data => {
-            word += data;
-        });
 
-        response.on('end', () => {
-            word = JSON.parse(word);
-            resolve(word[0]);
-        });
+    const testWord = async () => {
+        https.get(`https://random-word-api.herokuapp.com/word?length=${wordLen}`, response => { 
+            response.on('data', data => {
+                word += data;
+            });
 
-    }).on('error', err => {
-        reject(`Issue when fetching random word: ${err.message}.`);
-    });
+            response.on('end', () => {
+                word = JSON.parse(word);
+
+                if (checkURL(word))    // If the URL is free
+                {
+                    resolve(word[0]);
+                }
+                else
+                {
+                    word = "";
+                    testWord();
+                }
+            });
+
+        }).on('error', err => {
+            reject(`Issue when fetching random word: ${err.message}.`);
+        });
+    }
+
+    testWord();
+    
 });
+
+/**
+ * Check to ensure that the URL we have isn't already in use
+ * @param {String} url The URL to check 
+ * @returns {Boolean} Whether or not the URL is free
+ */
+const checkURL = (url) => {
+    return true;
+}
 
 /**
  * Handles symmetric file upload when the CLI server recieves a request 
@@ -59,6 +82,10 @@ function uploadSymm(data, expireTime, burnOnRead, pwdHash)
             .then(newFilePath => {
                 // Write to database
                 // Auto delete process start
+
+                // Hash pwds again and then store it
+                let pwdHash2 = cryptoUtil.genPwdHash(pwdHash, 32);
+
                 console.log(`Data written to ${newFilePath}`);
                 resolve();
             }).catch(err => {

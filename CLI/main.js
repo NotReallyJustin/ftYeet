@@ -118,8 +118,8 @@ program
         'decryption may fail if this does not match the one used to encrypt', 'chacha20-poly1305')
     .option('-c, --auth-code [password]', 'authentication code used to verify file HMAC; password would be used if this is left empty')
     .action((options) => {
-        console.dir(options)
-    })
+        functions.downloadSymm(options.directory, options.password, options.algorithm, options.authCode, options.url);
+    });
 ;
 
 program

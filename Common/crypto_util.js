@@ -25,7 +25,7 @@ import {
 export { supportedCiphers, supportedAsymmetrics, secureKeyGen, zeroBuffer, symmetricDecrypt, symmetricEncrypt, secureSign, secureVerify, compatPrivKE, compatPubKE, genKeyPair, 
     keyEncodingFormats, keyEncodingTypes, supportedHashes, genHMAC, fromFileSyntaxAsymm, toFileSyntaxAsymm, fromFileSyntaxSymm, toFileSyntaxSymm, genAsymmCryptosystem,
     pubKeyType, base64ToPubKey, keyToBase64, genPwdHash, verifyPwdHash, fromFileConstruct, toFileConstruct, genPrivKeyObject, genPubKeyObject,
-    keyToBin }
+    keyToBin, genHash }
 
 /**
  * Verifies a file name to ensure it doesn't contain / \ .. : * ? < > | &. Also make sure it's less than 30 characters.
@@ -107,21 +107,22 @@ const secureKeyGen = (password, length, salt) => {
 
 /**
  * Hashes a password. This uses scrypt instead of a normal hashing function to make it more resistant to brute forcing.
- * The SALT is randomized. Check this with `verifyPwdHash()`
+ * The SALT is randomized if the `salt` param isn't specified. Check this with `verifyPwdHash()`
  * @param {String} pwd The password string to hash
  * @param {Number} length The size of the resulting hash (in bytes). We recommend making this >= 32 bytes.
+ * @param {String} salt Specify a salt to use for the hash. This should be as random as possible.
  * @see `secureKeyGen()`
  * @throws If `length < 16`.
  * @returns {String} A hex representing the hashed password.
  */
-const genPwdHash = (pwd, length) => {
+const genPwdHash = (pwd, length, salt) => {
 
     if (length < 16)
     {
         throw "Length of the hash must be >= 16 bytes.";
     }
 
-    let keyPair = secureKeyGen(pwd, length);
+    let keyPair = secureKeyGen(pwd, length, salt);
     return `${keyPair.salt}$${keyPair.key}`;;
 }
 
@@ -1148,6 +1149,25 @@ const fromFileConstruct = (fileConstruct) => {
     }
 
     return deconstructed;
+}
+
+/**
+ * Generates a hash on a piece of data
+ * @param {String} hashAlg Hashing Algorithm. Must be in the list of `supportedHashes`, but we reccomend just using sha3-512
+ * @param {Buffer} data Data to HMAC. You are responsible for zeroing this out if needed
+ * @throws If HMAC Algorithm is not supported
+ * @returns {String} The hash, in hex
+ */
+const genHash = (data, hashAlg) => {
+
+    if (!supportedHashes.includes(hashAlg))
+    {
+        throw "Unsupported hash algorithm. Check `supportedHashes` in `crypto_util.js` for a list.";
+    }
+
+    let hashFunction = createHash(hashAlg);
+    hashFunction.update(data);
+    return hashFunction.digest('hex');
 }
 
 // 🛠️ Testing area 
