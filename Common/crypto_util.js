@@ -1,5 +1,6 @@
 // Node.js built-in crypto library (should be decently secure)
 // Providing all functions I'm using here for transparency reasons
+// This file might be symbolically linked
 import { 
     createHmac,
     sign,

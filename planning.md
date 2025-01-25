@@ -253,7 +253,7 @@ GET: https://api.ftyeet.something/downloadAsymm
         * Server verifies JWT token signature using public key on file
         * Server verifies IP and timestamp. Give users option for VPN
         * Request is invalid if 15 seconds has passed
-        * Store last nonce used in SQL database. The next request cannot have the same nonce (to prevent replay attacks - but lowkey if that happens, TLS is compromised and the world is cooked. But hey! If TLS is compromised, at least ftYeet would still be confidential)
+        * Store last nonce used in noSQL database. The next request cannot have the same nonce (to prevent replay attacks - but lowkey if that happens, TLS is compromised and the world is cooked. But hey! If TLS is compromised, at least ftYeet would still be confidential)
 ```
 * **Download Symm**
 ```
@@ -293,6 +293,8 @@ GET: https://api.ftyeet.something/download
     * Kinda mad I didn't think of this earlier lol
     * Can't access the private key files directly if they're basically on two different file systems (well... different volumes)
 * Use a bridge network driver 🙂 This acts as a firewall! Only the two containers can talk to each other
+* Docker compose up?
+    * Add SQL server in here too
 
 ## Future Plans
 * Prevent bots from abusing file upload (we only have so much space)

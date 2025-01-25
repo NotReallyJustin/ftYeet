@@ -23,10 +23,11 @@ const PORT = 443;
 mainServer.set('trust proxy', true);
 
 // Enable HTTPS and force users to use TLS/SSL
+// ⭐ Make sure to drop the cert, private key, and password in `./Secrets/`. Make the password Josh Allen or smth
 const httpsServer = createServer({
-    key: readFileSync(path.resolve(__dirname, "./Keys/privKey.pem"), {encoding: "utf-8"}),
-    cert: readFileSync(path.resolve(__dirname, "./Keys/cert.pem"), {encoding: "utf-8"}),
-    passphrase: process.env.PRIVKEY_PWD                 // ⭐ Make sure to create a `.env` file with the private key password. Make it "Josh Allen" or smth idk 🤷‍♂️
+    key: readFileSync("/run/secrets/server_privkey", {encoding: "utf-8"}),
+    cert: readFileSync("/run/secrets/cert", {encoding: "utf-8"}),
+    passphrase: readFileSync("/run/secrets/server_privkey_pwd", {encoding: "utf-8"})
 }, mainServer);
 
 mainServer.use((request, response, next) => {
