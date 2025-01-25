@@ -18,7 +18,25 @@ services:
     ports:
       - 443:443
       - 80:80
-
+  db:
+    image: postgres
+    restart: always
+    user: postgres
+    secrets:
+      - db-password
+    environment:
+      POSTGRES_DB: main
+      POSTGRES_PASSWORD_FILE: /run/secrets/db-password
+    # ports: 
+    #   - 5432:5432
+    expose:
+      - 5432
+    healthcheck:
+      test: [ "CMD", "pg_isready" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    
 secrets:
   cert:
     file: ./Secrets/cert.pem
@@ -26,6 +44,8 @@ secrets:
     file: ./Secrets/privKey.pem
   server_privkey_pwd:
     file: ./Secrets/privKeyPwd.txt
+  db-password:
+    file: ./Secrets/dbPassword.txt      # Set this to Brock Purdy or smth
 
 # The commented out section below is an example of how to define a PostgreSQL
 # database that your application can use. `depends_on` tells Docker Compose to
@@ -33,9 +53,9 @@ secrets:
 # database data between container restarts. The `db-password` secret is used
 # to set the database password. You must create `db/password.txt` and add
 # a password of your choosing to it before running `docker-compose up`.
-#     depends_on:
-#       db:
-#         condition: service_healthy
+    # depends_on:
+    #   db:
+    #     condition: service_healthy
 #   db:
 #     image: postgres
 #     restart: always
