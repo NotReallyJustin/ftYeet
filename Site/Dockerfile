@@ -7,13 +7,13 @@ ARG NODE_VERSION=22.13.0
 FROM node:${NODE_VERSION}-alpine AS build-common
 ENV NODE_ENV=production
 WORKDIR /usr/src/app
-COPY Common/ /usr/src/app/Common
+COPY Common/ /usr/src/app/Common/
 
 # Copy Site
 FROM node:${NODE_VERSION}-alpine AS build-site
 WORKDIR /usr/src/app
-COPY Site/ /usr/src/app/Site
-COPY Site/Keys /usr/src/app/Site/Keys
+COPY Site/ /usr/src/app/Site/
+COPY Site/Keys/ /usr/src/app/Site/Keys/
 WORKDIR /usr/src/app/Site
 
 RUN --mount=type=bind,source=Site/package.json,target=package.json \
@@ -25,8 +25,8 @@ RUN --mount=type=bind,source=Site/package.json,target=package.json \
 FROM node:${NODE_VERSION}-alpine
 WORKDIR /usr/src/app/Site
 
-COPY --from=build-site /usr/src/app/Site /usr/src/app/Site
-COPY --from=build-common /usr/src/app/Common /usr/src/app/Common
+COPY --from=build-site /usr/src/app/Site/ /usr/src/app/Site/
+COPY --from=build-common /usr/src/app/Common/ /usr/src/app/Common/
 
 # Run the application as a non-root user.
 USER node

@@ -11,15 +11,24 @@ services:
       dockerfile: ./Site/Dockerfile
     environment:
       NODE_ENV: production
+      PGUSER: postgres
+      PGHOST: db
+      PGDATABASE: main
+      QUERYTIMEOUT: 10000
+      CONNECTIONTIMEOUT: 10000
     secrets:
       - cert
       - server_privkey
       - server_privkey_pwd
+      - db-password
     ports:
       - 443:443
       - 80:80
   db:
-    image: postgres
+    # image: postgres
+    build:
+      context: ./
+      dockerfile: ./Database/Dockerfile
     restart: always
     user: postgres
     secrets:
@@ -27,10 +36,10 @@ services:
     environment:
       POSTGRES_DB: main
       POSTGRES_PASSWORD_FILE: /run/secrets/db-password
-    # ports: 
-    #   - 5432:5432
-    expose:
-      - 5432
+    ports: 
+      - 5432:5432
+    # expose:
+    #   - 5432
     healthcheck:
       test: [ "CMD", "pg_isready" ]
       interval: 10s
