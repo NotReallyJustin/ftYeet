@@ -12,6 +12,10 @@ Inspired by a certain Cheese
 * Use `openssl` to generate a `X509` cert and private key in `Site/Keys/`. Put the password for the private key in `Site/.env` as `PRIVKEY_PWD`
 * If needed for testing purposes, run `$CLI/cli.exe keygen <args>` to create asymmetric keys
 
+## Setting up Docker
+* Make sure you install docker
+* Download or pull the `postgres` image from Docker Hub
+
 ## Setting up Secrets
 Here's a one-liner to self-signed key and cert files. Add `-nodes` at the end to prevent the private key from getting encrypted
 ```bash
