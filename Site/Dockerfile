@@ -2,6 +2,8 @@
 # This is a multi-stage file so we can restrict what the Docker build process itself has access to
 
 ARG NODE_VERSION=22.13.0
+ARG FWGROUPID
+ARG FWGROUPNAME
 
 # Copy Common
 FROM node:${NODE_VERSION}-alpine AS build-common
@@ -30,10 +32,17 @@ COPY --from=build-common /usr/src/app/Common/ /usr/src/app/Common/
 
 # Make a directory that node can wrote
 RUN mkdir /usr/src/app/Site/files
+
 # x permission for dirs == you can $cd into it
 # +x to a dir doesn't give +x to files inside it, so we good. By default, when a file is created, it doesn't have execute perms for owner.
-# We will address the issue of execution later by changing file owner to root and restricting +x perms
+# We will address the issue of execution later by changing file owner to root, changing group to $FWGROUPNAME, and restricting +x perms
 RUN chmod 777 /usr/src/app/Site/files           
+
+# Perms
+RUN addgroup ${FWGROUPNAME} --gid ${FWGROUPID}
+RUN usermod -a -G ${FWGROUPNAME} root
+RUN usermod -a -G ${FWGROUPNAME} node
+RUN newgrp ${FWGROUPNAME}
 
 # Run the application as a non-root user.
 USER node

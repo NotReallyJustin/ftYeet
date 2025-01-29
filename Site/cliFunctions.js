@@ -139,17 +139,18 @@ function secureWrite(data)
             }
             else
             {
-                // 600 - Only this "user" can read and write to file
+                // For security, change file owner to root, change file group to fileWrite, and them chmod 666
+                const ROOT_ID = 0;
+                let status = fileUtil.chmod(newFilePath, 0o666);
+                status = status && fileUtil.chown(newFilePath, ROOT_ID, process.env.FWGROUPID);
 
-                // TODO: Add node to fileWrite group, add root to fileWrite group, change file owner to root, and then chmod 660
-                let status = fileUtil.chmod(newFilePath, 0o600);
                 if (status)
                 {
                     resolve(newFilePath, fileName);
                 }
                 else
                 {
-                    reject();
+                    reject("Failed to properly set file permissions.");
                 }
             }
         }); 

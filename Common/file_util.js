@@ -7,10 +7,11 @@ import {
     accessSync,
     constants,
     statSync,
-    chmodSync
+    chmodSync,
+    chownSync
 } from 'node:fs';
 
-export { isFile, isDir, getFileSize, exists, hasPerms, canRead, canWrite, canExecute, chmod, verifyFileName }
+export { isFile, isDir, getFileSize, exists, hasPerms, canRead, canWrite, canExecute, chmod, verifyFileName, chown }
 /**
  * Checks if a file path is actually a file
  * @param {String} path The path to check
@@ -159,6 +160,40 @@ function chmod(path, permissionMode)
     catch(err)
     {
         console.error(`Error when changing permissions: ${err.toString()}`);
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * Changes the owner of a file. This could either be changing the owner, or the group. Use `undefined` if you don't wish to change something.
+ * @param {String} path The path of the file or directory to `chown`
+ * @param {Number|undefined} ownerID User ID of the new file owner. Set this to `undefined` if you don't wish to change this.
+ * @param {Number|undefined} newGroupID ID of the new group that owns this file. Set this to `undefined` if you don't wish to change this.
+ * @throws Errors if the path doesn't exist
+ * @returns {Boolean} Whether the operation was successful.
+ */
+function chown(path, ownerID, newGroupID)
+{
+    if (!exists(path))
+    {
+        console.error("Path does not exist. Can't change owner of a non-existent file.");
+        return false;
+    }
+
+    // Get current stats
+    const fileStats = statSync(path);
+    let currentUID = fileStats.uid;
+    let currentGID = fileStats.gid;
+
+    try
+    {
+        chownSync(path, ownerID != undefined ? ownerID : currentUID, newGroupID != undefined ? newGroupID : currentGID);
+    }
+    catch(err)
+    {
+        console.error(`Error when changing owner of ${path}: ${err.toString()}`);
         return false;
     }
 
