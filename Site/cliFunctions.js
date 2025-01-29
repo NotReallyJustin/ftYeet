@@ -3,13 +3,14 @@ import { writeFile, chmod } from 'fs';
 import * as cryptoUtil from '../Common/crypto_util.js';
 import * as path from 'path';
 import * as fileUtil from '../Common/file_util.js';
+import { runQuery } from './psql.js';
 import { randomBytes } from 'crypto';
 export { genURL, uploadSymm, checkURL }
 
 // ⭐ Formatting note: I use () => {} if there's no side effects. function() {} is used when there is a side effect
 
 const TEMP_PWD = "Temporary";
-const FILE_DIR = "./";
+const FILE_DIR = "./files/";
 
 /**
  * Fetches a random word. Then, it checks if that word has already been used. If it has, get another word.
@@ -65,10 +66,11 @@ const checkURL = (url) => {
  * @param {Number} expireTime Number of seconds before this file gets deleted
  * @param {Boolean} burnOnRead Whether to delete the file upon download
  * @param {String} pwdHash Hash of the password used to encrypt the file (in hex). This is going to be hashed again.
+ * @param {String} url The URL you can access the file from
  * @throws Promise rejects if anything goes wrong with the symmetric file upload process. If this happens, return a 400 error.
  * @returns {Proimse<>} .then() when it's successful
  */
-function uploadSymm(data, expireTime, burnOnRead, pwdHash)
+function uploadSymm(data, expireTime, burnOnRead, pwdHash, url)
 {
     // Encrypt the data again (by converting it to - you guessed it - another file syntax!). In the future, this is gonna get moved
     let symmEnc = cryptoUtil.symmetricEncrypt(TEMP_PWD, TEMP_PWD, data, 'chacha20-poly1305', 12);
@@ -79,15 +81,26 @@ function uploadSymm(data, expireTime, burnOnRead, pwdHash)
 
     return new Promise((resolve, reject) => {
         secureWrite(encryptedData)
-            .then(newFilePath => {
-                // Write to database
-                // Auto delete process start
-
+            .then((newFilePath, fileName) => {
                 // Hash pwds again and then store it
                 let pwdHash2 = cryptoUtil.genPwdHash(pwdHash, 32);
 
-                console.log(`Data written to ${newFilePath}`);
-                resolve();
+                // Write to database
+                let expireTimestamp = new Date(Date.now() + expireTime * 1000);
+
+                runQuery(
+                    "INSERT INTO files(Name, PwdHashHash, BurnOnRead, ExpireTime, Url, CheckSum) VALUES($1, $2, $3, $4, $5, $6)",
+                    [fileName, pwdHash2, burnOnRead, expireTimestamp, url, "TODO: REPLACE THIS"]
+                ).then(() => {
+
+                    // Auto delete process start              
+                    console.log(`Data written to ${newFilePath}`);
+                    resolve();
+
+                }).catch((err) => {
+                    console.error(`Error in uploadSymm when running SQL: ${err}`);
+                });
+
             }).catch(err => {
                 console.error(`Error in uploadSymm: ${err}`);
                 reject(err);
@@ -99,7 +112,7 @@ function uploadSymm(data, expireTime, burnOnRead, pwdHash)
  * Validates the file name (to prevent fiddling with paths), encrypts the file name if it is, disables execution for everyone, and writes the binary data to a file.
  * The new file name will be a randomly generated 64-byte hex (max file name size)
  * @param {Buffer} data The binary data to write to the file. ⭐ This data will be encrypted again via file syntax. ⭐
- * @returns {Promise<String>} Promise resolves with the [new] encrypted file path
+ * @returns {Promise<String, String>} Promise resolves with the `[new] encrypted file path` and the `file name`
  */
 function secureWrite(data)
 {
@@ -107,11 +120,12 @@ function secureWrite(data)
 
         // Generate a random, unique file name that's 64 bytes
         let newFilePath;
+        let fileName;
         
         // TODO: Once we get the database up, don't use the exist function. Just make a db query instead. It's much faster
         while (newFilePath == undefined || fileUtil.exists(newFilePath))
         {
-            let fileName = randomBytes(64).toString('hex');
+            fileName = randomBytes(32).toString('hex');
             newFilePath = path.resolve(FILE_DIR, fileName);
         }
 
@@ -126,10 +140,12 @@ function secureWrite(data)
             else
             {
                 // 600 - Only this "user" can read and write to file
+
+                // TODO: Add node to fileWrite group, add root to fileWrite group, change file owner to root, and then chmod 660
                 let status = fileUtil.chmod(newFilePath, 0o600);
                 if (status)
                 {
-                    resolve(newFilePath);
+                    resolve(newFilePath, fileName);
                 }
                 else
                 {

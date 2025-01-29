@@ -28,6 +28,13 @@ WORKDIR /usr/src/app/Site
 COPY --from=build-site /usr/src/app/Site/ /usr/src/app/Site/
 COPY --from=build-common /usr/src/app/Common/ /usr/src/app/Common/
 
+# Make a directory that node can wrote
+RUN mkdir /usr/src/app/Site/files
+# x permission for dirs == you can $cd into it
+# +x to a dir doesn't give +x to files inside it, so we good. By default, when a file is created, it doesn't have execute perms for owner.
+# We will address the issue of execution later by changing file owner to root and restricting +x perms
+RUN chmod 777 /usr/src/app/Site/files           
+
 # Run the application as a non-root user.
 USER node
 

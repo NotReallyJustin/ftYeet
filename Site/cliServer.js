@@ -101,7 +101,7 @@ apiRouter.post("/upload", (request, response) => {
         return response.status(400).send("Error when uploading: You must provide a valid URL. Make sure you're using the CLI and not tampering with stuff on your own.")
     }
 
-    cliFunctions.uploadSymm(request.body, expireTime, burnOnRead, request.headers['pwd-hash'])
+    cliFunctions.uploadSymm(request.body, expireTime, burnOnRead, request.headers['pwd-hash'], request.headers['url'])
         .then(() => {
             response.send(request.headers['url']);
         }).catch(err => {
