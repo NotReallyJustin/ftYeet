@@ -185,7 +185,7 @@ function chown(path, ownerID, newGroupID)
     // Get current stats
     const fileStats = statSync(path);
     let currentUID = fileStats.uid;
-    let currentGID = fileStats.gid;
+    let currentGID = parseInt(fileStats.gid);
 
     try
     {

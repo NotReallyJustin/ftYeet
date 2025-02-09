@@ -7,7 +7,7 @@ import pg from 'pg';
 import {readFileSync } from 'fs';
 const { Pool } = pg;
 
-export { runQuery }
+export { runQuery, logSymmFile, getFile }
 
 /**
  * Available pool of clients. Generate a client from these to connect to and execute queries to our PSQL dockerfile
@@ -29,6 +29,7 @@ const clientPool = new Pool({
  * @param {String} queryText The query itself. Use `$1`, `$2`, `...` to put add a parameter.
  * @param {Object[]} queryValues Arguments to fill into the parameterized query. Pass this in as an array. I highly doubt that you don't have **any** arguments, but if you don't, pass in an empty array.
  * @param {Boolean|Undefined} arrayRowMode Whether or not to return the query output/result as an array. This is `optional`.
+ * @returns {Promise<Object>} The results from the query
  * @see https://node-postgres.com/features/queries
  * @throw Errors if you don't provide a queryText or queryValue. It will get REALLY mad at you if you don't provide a queryValue.
  */
@@ -73,8 +74,78 @@ async function runQuery(queryText, queryValues, arrayRowMode)
     catch (err) 
     {
         await client.release(true); // Destroy the client. We no longer need it.
-        console.error(`Error when running query: ${err.message}`);
+        throw `Error when running query: ${err.message}`;
     }
+}
+
+/**
+ * Logs a file encrypted symmetrically in the postgres database.
+ * @param {String} fileName The name of the file as stored on our end. This should be unique and randomly generated (hopefully)
+ * @param {String} pwdHash2 The hash of the password hash provided by the user.
+ * @param {boolean} burnOnRead Whether this file should be burnt when we download it
+ * @param {Date} expireTimestamp Timestamp when the file expires (and gets marked for deletion)
+ * @param {String} url URL you can access the file from
+ * @throws If any of the inputs are invalid
+ */
+async function logSymmFile(fileName, pwdHash2, burnOnRead, expireTimestamp, url)
+{
+    // TODO: Add filetype symmetric in this thing
+    if (fileName == undefined || pwdHash2 == undefined || burnOnRead == undefined || expireTimestamp == undefined || url == undefined)
+    {
+        throw "Error when logging file: There's something in the input that is undefined.";
+    }
+
+    if (!(date instanceof Date))
+    {
+        throw "Error when logging file: `expireTimestamp` is not a date.";
+    }
+
+    // Generate checksum (read: digital signature) of everything here
+    let checksum = "TODO: Replace this with an actual checksum";
+
+    // Upload to DB
+    try
+    {
+        await runQuery(
+            "INSERT INTO files(Name, PwdHashHash, BurnOnRead, ExpireTime, Url, CheckSum) VALUES($1, $2, $3, $4, $5, $6)",
+            [fileName, pwdHash2, burnOnRead, expireTimestamp, url, checksum]
+        );
+    }
+    catch(err)
+    {
+        throw err.message;
+    }
+}
+
+/**
+ * Retrieves a file at the specified URL
+ * @param {String} url URL where the file is stored
+ * @returns ??? We shall find out
+ */
+async function getFile(url)
+{
+    if (url == undefined)
+    {
+        throw "Error when getting file: `url` is undefined.";
+    }
+
+    let dbOutput;
+    
+    // Retrieve from DB
+    try
+    {
+        dbOutput = await runQuery(
+            "SELECT * FROM files WHERE url = $1",
+            [url]
+        );
+    }
+    catch(err)
+    {
+        throw err.message;
+    }
+
+    console.log(dbOutput)
+    return dbOutput;
 }
 
 // If we have SIGINT or SIGTERM, gracefully shut down the pool

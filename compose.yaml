@@ -9,6 +9,9 @@ services:
     build:
       context: ./
       dockerfile: ./Site/Dockerfile
+      args:
+        FWGROUPID: 9000
+        FWGROUPNAME: filewrite
     environment:
       NODE_ENV: production
       PGUSER: postgres
@@ -16,9 +19,9 @@ services:
       PGDATABASE: main
       PGPORT: 5432      # Make sure these env vars match with the db service below
       QUERYTIMEOUT: 10000
-      CONNECTIONTIMEOUT: 2000
-      FWGROUPID: 1010   # Make sure this matches with args
-      FWGROUPNAME: filewrite    # Make sure this matches with args
+      CONNECTIONTIMEOUT: 5000
+      FWGROUPID: 1010   # Make sure this matches with build args
+      FWGROUPNAME: filewrite    # Make sure this matches with build args
     secrets:
       - cert
       - server_privkey
@@ -27,9 +30,6 @@ services:
     ports:
       - 443:443
       - 80:80
-    args:
-      - FWGROUPID=1010
-      - FWGROUPNAME=filewrite
   db:
     # image: postgres
     build:

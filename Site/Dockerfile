@@ -2,8 +2,6 @@
 # This is a multi-stage file so we can restrict what the Docker build process itself has access to
 
 ARG NODE_VERSION=22.13.0
-ARG FWGROUPID
-ARG FWGROUPNAME
 
 # Copy Common
 FROM node:${NODE_VERSION}-alpine AS build-common
@@ -25,6 +23,8 @@ RUN --mount=type=bind,source=Site/package.json,target=package.json \
 
 # Run the actual site - Copy from previous stages
 FROM node:${NODE_VERSION}-alpine
+ARG FWGROUPID
+ARG FWGROUPNAME
 WORKDIR /usr/src/app/Site
 
 COPY --from=build-site /usr/src/app/Site/ /usr/src/app/Site/
@@ -39,10 +39,9 @@ RUN mkdir /usr/src/app/Site/files
 RUN chmod 777 /usr/src/app/Site/files           
 
 # Perms
-RUN addgroup ${FWGROUPNAME} --gid ${FWGROUPID}
-RUN usermod -a -G ${FWGROUPNAME} root
-RUN usermod -a -G ${FWGROUPNAME} node
-RUN newgrp ${FWGROUPNAME}
+RUN addgroup -g ${FWGROUPID} ${FWGROUPNAME} 
+RUN adduser root ${FWGROUPNAME}
+RUN adduser node ${FWGROUPNAME}
 
 # Run the application as a non-root user.
 USER node

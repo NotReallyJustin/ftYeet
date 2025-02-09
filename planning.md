@@ -285,6 +285,9 @@ GET: https://api.ftyeet.something/download
 * ^^ Decided against this: If you can upload files, you can download files. If you can download files, you can probably run them.
 * `"You don't get hacked by files. You get hacked by *processes*"` - guy from BSides
 * Track total size
+* `chown` to an account with no login perms
+* We can disable `chmod` and stuff for that app
+* `sudo -u vulnNodeAppUser node /path/to/app/index.js`
 
 ## Containerization
 * Docker - not because it's trendy but because I really don't want someone to upload and then execute a script that modifies `/etc/shadow` or smth
@@ -303,3 +306,6 @@ GET: https://api.ftyeet.something/download
 * 🚨 Lowkey thinking of just flat out not giving users permission to upload a file without a password because c'mon dude at that point why even bother 
 * 2FA? Lowkey this is probably overkill
 * Node.js stand alone executables
+
+## Next project idea
+* Lowkey I want to write a script that prevents a user like apache from doing ANYTHING other than serving a website

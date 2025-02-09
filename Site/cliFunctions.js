@@ -3,9 +3,9 @@ import { writeFile, chmod } from 'fs';
 import * as cryptoUtil from '../Common/crypto_util.js';
 import * as path from 'path';
 import * as fileUtil from '../Common/file_util.js';
-import { runQuery } from './psql.js';
+import { getFile, logSymmFile, runQuery } from './psql.js';
 import { randomBytes } from 'crypto';
-export { genURL, uploadSymm, checkURL }
+export { genURL, uploadSymm, checkURL, downloadSymm }
 
 // ⭐ Formatting note: I use () => {} if there's no side effects. function() {} is used when there is a side effect
 
@@ -54,11 +54,22 @@ const genURL = () => new Promise((resolve, reject) => {
 /**
  * Check to ensure that the URL we have isn't already in use
  * @param {String} url The URL to check 
+ * @throws Errors if the SQL fails
  * @returns {Boolean} Whether or not the URL is free
  */
 const checkURL = (url) => {
+    runQuery("SELECT * FROM files WHERE Url=$1", [url], true)
+        .then(result => {
+            console.log(result.rows.length == 0)
+        }).catch((err) => {
+            console.error(`Error in uploadSymm when running SQL: ${err}`);
+            throw "Internal Database Error. Ask the owner of ftYeet to check their logs.";
+        });
+
     return true;
 }
+
+// TODO: Check file name. If they match, do not run it.
 
 /**
  * Handles symmetric file upload when the CLI server recieves a request 
@@ -88,22 +99,43 @@ function uploadSymm(data, expireTime, burnOnRead, pwdHash, url)
                 // Write to database
                 let expireTimestamp = new Date(Date.now() + expireTime * 1000);
 
-                runQuery(
-                    "INSERT INTO files(Name, PwdHashHash, BurnOnRead, ExpireTime, Url, CheckSum) VALUES($1, $2, $3, $4, $5, $6)",
-                    [fileName, pwdHash2, burnOnRead, expireTimestamp, url, "TODO: REPLACE THIS"]
+                logSymmFile(
+                    fileName, pwdHash2, burnOnRead, expireTimestamp, url
                 ).then(() => {
 
-                    // Auto delete process start              
+                    // Auto delete process start       
+
                     console.log(`Data written to ${newFilePath}`);
                     resolve();
 
                 }).catch((err) => {
                     console.error(`Error in uploadSymm when running SQL: ${err}`);
+                    reject("Internal Database Error. Ask the owner of ftYeet to check their logs.");
                 });
 
             }).catch(err => {
                 console.error(`Error in uploadSymm: ${err}`);
                 reject(err);
+            });
+    });
+}
+
+/**
+ * Downloads a file from the ftYeet server with a symmetric key
+ * @param {String} url The URL where the key is at
+ * @param {String} pwdHash The password hash to authenticate
+ * @throws Errors if authentication goes wrong, decryption goes wrong, or if the file doesn't exist
+ * @returns {Promise<Buffer>} The file buffer. This should have the encrypted (1x) file contents.
+ */
+function downloadSymm(url, pwdHash)
+{
+    return new Promise((resolve, reject) => {
+        getFile(url)
+            .then(dbOutput => {
+                resolve();
+            }).catch(err => {
+                console.error(`Error in uploadSymm when running SQL: ${err}`);
+                reject("Internal Database Error. Ask the owner of ftYeet to check their logs.");
             });
     });
 }
@@ -118,7 +150,7 @@ function secureWrite(data)
 {
     return new Promise((resolve, reject) => {
 
-        // Generate a random, unique file name that's 64 bytes
+        // Generate a random, unique file name that's 64 bytes (AKA 64 hexes)
         let newFilePath;
         let fileName;
         
@@ -140,9 +172,10 @@ function secureWrite(data)
             else
             {
                 // For security, change file owner to root, change file group to fileWrite, and them chmod 666
+                // fuck that doesn't work bc it's privileged
                 const ROOT_ID = 0;
                 let status = fileUtil.chmod(newFilePath, 0o666);
-                status = status && fileUtil.chown(newFilePath, ROOT_ID, process.env.FWGROUPID);
+                status = status && fileUtil.chown(newFilePath, ROOT_ID, parseInt(process.env.FWGROUPID));
 
                 if (status)
                 {
@@ -150,6 +183,7 @@ function secureWrite(data)
                 }
                 else
                 {
+                    // TODO: This chmod thing does NOT work. Find a way to deactivate all perms
                     reject("Failed to properly set file permissions.");
                 }
             }

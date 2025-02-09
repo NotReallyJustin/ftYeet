@@ -188,7 +188,12 @@ apiRouter.get("/download", (request, response) => {
         return response.status(400).send("Error when uploading: You must provide a pwd-hash (password hash). This should be done for you via the CLI.");
     }
 
-    response.send("This is the CLI Server. You are downloading symm.");
+    cliFunctions.downloadSymm(request.headers['url'], request.headers['pwd-hash'])
+        .then(() => {
+            response.send("This is the CLI Server. You are downloading symm.");
+        }).catch(err => {
+            response.status(404).send(`Error when downloading: ${err}.`);
+        });
 });
 
 // // Middleware to handle errors
