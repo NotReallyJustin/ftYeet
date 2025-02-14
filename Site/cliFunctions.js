@@ -22,16 +22,20 @@ const genURL = () => new Promise((resolve, reject) => {
     var wordLen = Math.floor(Math.random() * 4) + 7;
     let word = "";
 
+    // !!!Heroku app is down FOR NOW!!!
+    resolve("helllooooo");
+    return;
     const testWord = async () => {
+        
         https.get(`https://random-word-api.herokuapp.com/word?length=${wordLen}`, response => { 
             response.on('data', data => {
                 word += data;
             });
 
-            response.on('end', () => {
+            response.on('end', async () => {
                 word = JSON.parse(word);
 
-                if (checkURL(word))    // If the URL is free
+                if (await checkURL(word))    // If the URL is free
                 {
                     resolve(word[0]);
                 }
@@ -55,21 +59,18 @@ const genURL = () => new Promise((resolve, reject) => {
  * Check to ensure that the URL we have isn't already in use
  * @param {String} url The URL to check 
  * @throws Errors if the SQL fails
- * @returns {Boolean} Whether or not the URL is free
+ * @returns {Promise<Boolean>} Whether or not the URL is free
  */
-const checkURL = (url) => {
-    runQuery("SELECT * FROM files WHERE Url=$1", [url], true)
+const checkURL = async (url) => {
+    runQuery("SELECT * FROM files WHERE Url=$1", [url])
         .then(result => {
-            console.log(result.rows.length == 0)
+            // Rows contains the actual stuff
+            return result.rows.length == 0;
         }).catch((err) => {
             console.error(`Error in uploadSymm when running SQL: ${err}`);
             throw "Internal Database Error. Ask the owner of ftYeet to check their logs.";
         });
-
-    return true;
 }
-
-// TODO: Check file name. If they match, do not run it.
 
 /**
  * Handles symmetric file upload when the CLI server recieves a request 
@@ -92,7 +93,7 @@ function uploadSymm(data, expireTime, burnOnRead, pwdHash, url)
 
     return new Promise((resolve, reject) => {
         secureWrite(encryptedData)
-            .then((newFilePath, fileName) => {
+            .then((pathObjects) => {
                 // Hash pwds again and then store it
                 let pwdHash2 = cryptoUtil.genPwdHash(pwdHash, 32);
 
@@ -100,12 +101,12 @@ function uploadSymm(data, expireTime, burnOnRead, pwdHash, url)
                 let expireTimestamp = new Date(Date.now() + expireTime * 1000);
 
                 logSymmFile(
-                    fileName, pwdHash2, burnOnRead, expireTimestamp, url
+                    pathObjects.fileName, pwdHash2, burnOnRead, expireTimestamp, url
                 ).then(() => {
 
                     // Auto delete process start       
 
-                    console.log(`Data written to ${newFilePath}`);
+                    console.log(`Data written to ${pathObjects.newFilePath}`);
                     resolve();
 
                 }).catch((err) => {
@@ -132,7 +133,14 @@ function downloadSymm(url, pwdHash)
     return new Promise((resolve, reject) => {
         getFile(url)
             .then(dbOutput => {
-                resolve();
+
+                if (dbOutput == null)
+                {
+                    reject(`The URL is either invalid, or it expired.`);
+                    return;
+                }
+                
+                resolve(dbOutput);
             }).catch(err => {
                 console.error(`Error in uploadSymm when running SQL: ${err}`);
                 reject("Internal Database Error. Ask the owner of ftYeet to check their logs.");
@@ -144,7 +152,7 @@ function downloadSymm(url, pwdHash)
  * Validates the file name (to prevent fiddling with paths), encrypts the file name if it is, disables execution for everyone, and writes the binary data to a file.
  * The new file name will be a randomly generated 64-byte hex (max file name size)
  * @param {Buffer} data The binary data to write to the file. ⭐ This data will be encrypted again via file syntax. ⭐
- * @returns {Promise<String, String>} Promise resolves with the `[new] encrypted file path` and the `file name`
+ * @returns {Promise<{fileName: string, newFilePath: string}>} Promise resolves with the `[new] encrypted file path` and the `file name` as JSON
  */
 function secureWrite(data)
 {
@@ -171,19 +179,16 @@ function secureWrite(data)
             }
             else
             {
-                // For security, change file owner to root, change file group to fileWrite, and them chmod 666
-                // fuck that doesn't work bc it's privileged
-                const ROOT_ID = 0;
+                // For security, disable execution perms
                 let status = fileUtil.chmod(newFilePath, 0o666);
-                status = status && fileUtil.chown(newFilePath, ROOT_ID, parseInt(process.env.FWGROUPID));
+                // status = status && fileUtil.chown(newFilePath, ROOT_ID, parseInt(process.env.FWGROUPID));
 
                 if (status)
                 {
-                    resolve(newFilePath, fileName);
+                    resolve({newFilePath: newFilePath, fileName: fileName});
                 }
                 else
                 {
-                    // TODO: This chmod thing does NOT work. Find a way to deactivate all perms
                     reject("Failed to properly set file permissions.");
                 }
             }

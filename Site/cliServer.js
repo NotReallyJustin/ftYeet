@@ -189,15 +189,16 @@ apiRouter.get("/download", (request, response) => {
     }
 
     cliFunctions.downloadSymm(request.headers['url'], request.headers['pwd-hash'])
-        .then(() => {
-            response.send("This is the CLI Server. You are downloading symm.");
+        .then((fileSyntaxOutput) => {
+            // res.setHeader('content-type', 'text/plain');
+            response.send(fileSyntaxOutput);
         }).catch(err => {
             response.status(404).send(`Error when downloading: ${err}.`);
         });
 });
 
 // // Middleware to handle errors
-// mainServer.use((err, request, response, next) => {
+// apiRouter.use((err, request, response, next) => {
 
 //     // Errors we explicitly threw:
 //     if (err.status === 413)

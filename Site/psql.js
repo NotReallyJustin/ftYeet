@@ -92,10 +92,11 @@ async function logSymmFile(fileName, pwdHash2, burnOnRead, expireTimestamp, url)
     // TODO: Add filetype symmetric in this thing
     if (fileName == undefined || pwdHash2 == undefined || burnOnRead == undefined || expireTimestamp == undefined || url == undefined)
     {
+        console.log(`${fileName} ${pwdHash2} ${burnOnRead} ${expireTimestamp} ${url}`)
         throw "Error when logging file: There's something in the input that is undefined.";
     }
 
-    if (!(date instanceof Date))
+    if (!(expireTimestamp instanceof Date))
     {
         throw "Error when logging file: `expireTimestamp` is not a date.";
     }
@@ -108,7 +109,7 @@ async function logSymmFile(fileName, pwdHash2, burnOnRead, expireTimestamp, url)
     {
         await runQuery(
             "INSERT INTO files(Name, PwdHashHash, BurnOnRead, ExpireTime, Url, CheckSum) VALUES($1, $2, $3, $4, $5, $6)",
-            [fileName, pwdHash2, burnOnRead, expireTimestamp, url, checksum]
+            [fileName, pwdHash2, burnOnRead, expireTimestamp, url, checksum], false
         );
     }
     catch(err)
@@ -120,7 +121,7 @@ async function logSymmFile(fileName, pwdHash2, burnOnRead, expireTimestamp, url)
 /**
  * Retrieves a file at the specified URL
  * @param {String} url URL where the file is stored
- * @returns ??? We shall find out
+ * @returns {null | {name: String, pwdhashhash: String, burnonread: Boolean, expiretime: Date, url: String, checksum: String}} A JSON representing all the data about the file requested in the URL. Or null if the URL is invalid.
  */
 async function getFile(url)
 {
@@ -144,8 +145,15 @@ async function getFile(url)
         throw err.message;
     }
 
-    console.log(dbOutput)
-    return dbOutput;
+    //dbOutput.rows has > 1 item. A proper output should only have 1 item
+    if (dbOutput.rows.length != 1)
+    {
+        return null;
+    }
+    
+    // There shouldn't be multiple things in the same URL
+    // If there is, just return the first one
+    return dbOutput.rows[0];
 }
 
 // If we have SIGINT or SIGTERM, gracefully shut down the pool
