@@ -1,5 +1,5 @@
 import * as https from 'https';
-import { writeFile, chmod } from 'fs';
+import { writeFile, chmod, readFileSync } from 'fs';
 import * as cryptoUtil from '../Common/crypto_util.js';
 import * as path from 'path';
 import * as fileUtil from '../Common/file_util.js';
@@ -124,7 +124,7 @@ function uploadSymm(data, expireTime, burnOnRead, pwdHash, url)
 /**
  * Downloads a file from the ftYeet server with a symmetric key
  * @param {String} url The URL where the key is at
- * @param {String} pwdHash The password hash to authenticate
+ * @param {String} pwdHash The password hash to authenticate, in hex
  * @throws Errors if authentication goes wrong, decryption goes wrong, or if the file doesn't exist
  * @returns {Promise<Buffer>} The file buffer. This should have the encrypted (1x) file contents.
  */
@@ -140,9 +140,64 @@ function downloadSymm(url, pwdHash)
                     return;
                 }
                 
-                resolve(dbOutput);
+                // Verify checksum/digital signature - to come later
+
+                // Validate password hash
+                if (cryptoUtil.verifyPwdHash(pwdHash, dbOutput.pwdhashhash))
+                {
+                    reject(`Invalid password for file.`);
+                    return;
+                }
+
+                // If it's burn on read, delete the entry
+                if (cryptoUtil.burnOnRead)
+                {
+                    // Initiate deletion
+                }
+                
+                // ⭐ If everything is good, read the file and resolve the output
+                let filePath = path.resolve(FILE_DIR, dbOutput.name);
+                let fileSyntax;
+
+                try
+                {
+                    fileSyntax = readFileSync(filePath);
+                }
+                catch(err)
+                {
+                    console.error(`Error in downloadSymm when reading ${filePath}: ${err}`);
+                    reject(`Unable to retrieve file from ftyeet. The sender likely sent a malformed file.`);
+                }
+
+                // You usually can't work with file syntax. This resolves it.
+                let restored;
+
+                try
+                {
+                    restored = cryptoUtil.fromFileSyntaxSymm(undefined, TEMP_PWD, fileSyntax);
+                }
+                catch(err)
+                {
+                    console.error(`Error when converting from file syntax: ${err}`);
+                    reject(`Unable to retrieve file from ftyeet. ${err}`);
+                }
+
+                // This will still be in file syntax. We ran it twice.
+                let decrypted;
+
+                try
+                {
+                    decrypted = cryptoUtil.symmetricDecrypt(TEMP_PWD, TEMP_PWD, restored.data, 'chacha20-poly1305', restored.cryptoSystem);
+                }
+                catch(err)
+                {
+                    console.error(`Error when decrypting file syntax: ${err}`);
+                    reject(`Unable to retrieve file from ftyeet. ${err}`);
+                }
+
+                resolve(decrypted);
             }).catch(err => {
-                console.error(`Error in uploadSymm when running SQL: ${err}`);
+                console.error(`Error in downloadSymm when running SQL: ${err}`);
                 reject("Internal Database Error. Ask the owner of ftYeet to check their logs.");
             });
     });

@@ -121,7 +121,7 @@ async function logSymmFile(fileName, pwdHash2, burnOnRead, expireTimestamp, url)
 /**
  * Retrieves a file at the specified URL
  * @param {String} url URL where the file is stored
- * @returns {null | {name: String, pwdhashhash: String, burnonread: Boolean, expiretime: Date, url: String, checksum: String}} A JSON representing all the data about the file requested in the URL. Or null if the URL is invalid.
+ * @returns {Promise<null | {name: String, pwdhashhash: String, burnonread: Boolean, expiretime: Date, url: String, checksum: String>}} A JSON representing all the data about the file requested in the URL. Or null if the URL is invalid.
  */
 async function getFile(url)
 {

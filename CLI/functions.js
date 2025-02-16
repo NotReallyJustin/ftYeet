@@ -227,9 +227,8 @@ function uploadSymm(filePath, password, encAlg, authCode, expireTime, burnOnRead
  * @param {String} encAlg Encryption/Decryption algorithm
  * @param {String} authCode Password to generate HMAC key
  * @param {String} url The ftYeet URL where the file is stored
- * @param {String} fileSyntax 🛠️ TESTING ONLY - REMOVE WHEN DONE
  */
-function downloadSymm(dirPath, password, encAlg, authCode, url, fileSyntax)
+function downloadSymm(dirPath, password, encAlg, authCode, url)
 {
     // Error checks
     if (!fileUtil.exists(dirPath))
@@ -263,14 +262,20 @@ function downloadSymm(dirPath, password, encAlg, authCode, url, fileSyntax)
             "pwd-hash": cryptoUtil.genPwdHash(password, 64, urlHash),
             "Content-Type": "application/octet-stream"
         },
-        body: fileSyntax,
         follow: 1,
         agent: IGNORE_SSL_AGENT
     }).then((response) => {
         if (response.ok)
         {
-            response.text().then(response => {
-                console.log(response);
+            response.arrayBuffer().then(response => {
+
+                // ArrayBuffer != Buffer, so convert it
+                let fileSyntax = Buffer.from(response);
+
+                // Process file syntax
+                let restored = cryptoUtil.fromFileSyntaxSymm(undefined, authCode, fileSyntax);
+                
+                console.log(restored);
             });
         }
         else
