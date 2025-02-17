@@ -8,10 +8,13 @@ import {
     constants,
     statSync,
     chmodSync,
-    chownSync
+    chownSync,
+    writeFileSync
 } from 'node:fs';
 
-export { isFile, isDir, getFileSize, exists, hasPerms, canRead, canWrite, canExecute, chmod, verifyFileName, chown }
+import { dirname, parse, resolve } from 'node:path';
+
+export { isFile, isDir, getFileSize, exists, hasPerms, canRead, canWrite, canExecute, chmod, verifyFileName, chown, writeFileUnique }
 /**
  * Checks if a file path is actually a file
  * @param {String} path The path to check
@@ -198,6 +201,42 @@ function chown(path, ownerID, newGroupID)
     }
 
     return true;
+}
+
+/**
+ * Writes to a file. This function ensures that the file names don't duplicate.
+ * If there's a duplicate file name, the newly written file would look like "existingFile(1).extension"
+ * @param {String} filePath Path to write file to
+ * @param {Buffer} fileContents Contents of file to write to
+ * @param {Number} it Number of recursive calls this function is wrapped up in. Don't fill this out.
+ * @throws Errors if the directory to write to doesn't exist
+ */
+function writeFileUnique(filePath, fileContents, it)
+{
+    if (it == undefined)
+    {
+        it = 1;
+    }
+
+    // Just in case, make `filePath` absolute
+    filePath = resolve(filePath);
+
+    if (!isDir(dirname(filePath)))
+    {
+        return;
+    }
+
+    if (exists(filePath))
+    {
+        // Create existingFile(1).extension
+        let pathDissected = parse(filePath);
+        let newPath = `${pathDissected.dir}/${pathDissected.name}(${it})${pathDissected.ext}`;
+        writeFileUnique(newPath, fileContents, it + 1);
+    }
+    else
+    {
+        writeFileSync(filePath, fileContents);
+    }
 }
 
 /**

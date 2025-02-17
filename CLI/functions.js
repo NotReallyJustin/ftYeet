@@ -7,7 +7,7 @@ import * as fileUtil from '../Common/file_util.js';
 import fetch from 'node-fetch';
 import { writeFileSync, readFileSync } from 'node:fs';
 import { constants, publicEncrypt, privateDecrypt } from 'node:crypto';
-import { dirname, basename } from 'node:path';
+import { dirname, basename, resolve } from 'node:path';
 import { Agent } from 'https';
 
 export { keygen, uploadSymm, uploadAsymm, downloadSymm, downloadAsymm }
@@ -274,8 +274,15 @@ function downloadSymm(dirPath, password, encAlg, authCode, url)
 
                 // Process file syntax
                 let restored = cryptoUtil.fromFileSyntaxSymm(undefined, authCode, fileSyntax);
+                let symmDec = cryptoUtil.symmetricDecrypt(password, authCode, restored.data, encAlg, restored.cryptoSystem);
+                let unFileConstruct = cryptoUtil.fromFileConstruct(symmDec.toString('utf-8'));
                 
-                console.log(restored);
+                // Write the file!
+                // Doing it recursively to prevent overwrites
+                let filePath = resolve(dirPath, unFileConstruct.fileName);
+                fileUtil.writeFileUnique(filePath, unFileConstruct.fileContent);
+                
+                console.log(`Successfully downloaded file with URL ${url}.`);
             });
         }
         else
@@ -287,39 +294,6 @@ function downloadSymm(dirPath, password, encAlg, authCode, url)
     }).catch(err => {
         throw `Error when downloading file: ${err}`;
     });
-
-    // 🔨 To work on later once serverside is good
-    return;
-
-    // Clientside decryption
-    // First, parse file syntax
-    let restored = cryptoUtil.fromFileSyntaxSymm(undefined, authCode, fileSyntax);
-
-    // Decrypt the restored data. The decryption function checks the HMACs for us
-    let plaintext;
-    
-    try
-    {
-        plaintext = cryptoUtil.symmetricDecrypt(password, authCode, restored.data, encAlg, restored.cryptoSystem);
-    }
-    catch(err)
-    {
-        throw `Error when downloading file: Failed to decrypt file. \n${err}`;
-    }
-
-    // Un-File construct while checking for invalid file names (path traversals go brrr)
-    let unFileConstruct;
-    try
-    {
-        unFileConstruct = cryptoUtil.fromFileConstruct(plaintext.toString('utf-8'));
-    }
-    catch(err)
-    {
-        throw `Error when downloading file: Someone might have tampered with your file. \n${err}`;
-    }
-
-    // Write to file
-    writeFileSync(`${dirPath}/${unFileConstruct.fileName}`, unFileConstruct.fileContent);
 }
 
 /**
