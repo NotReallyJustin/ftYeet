@@ -9,15 +9,16 @@ services:
     build:
       context: ./
       dockerfile: ./Site/Dockerfile
-      args:
-        FWGROUPID: 9000
-        FWGROUPNAME: filewrite
+      # args:
+      #   FWGROUPID: 9000
+      #   FWGROUPNAME: filewrite
     environment:
       NODE_ENV: production
       PGUSER: postgres
       PGHOST: db
       PGDATABASE: main
       PGPORT: 5432      # Make sure these env vars match with the db service below
+      CRYPTOPORT: 5312  # Make sure these env vars match with the crypto service below
       QUERYTIMEOUT: 10000
       CONNECTIONTIMEOUT: 5000
       # FWGROUPID: 1010   # Make sure this matches with build args
@@ -27,6 +28,8 @@ services:
       - server_privkey
       - server_privkey_pwd
       - db_password
+      - crypto_pubkey_sign      
+      - crypto_pubkey         # We might not need this pubkey. If that's the case, remove this in prod later
     ports:
       - 443:443
       - 80:80
@@ -49,7 +52,22 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    
+  crypto:
+    build:
+      context: ./
+      dockerfile: ./Crypto/Dockerfile
+    environment:
+      PORT: 6312
+    secrets:
+      - crypto_key_password
+      - crypto_pubkey_sign
+      - crypto_privkey_sign
+      - crypto_cert
+      - crypto_cert_privkey
+      - crypto_privkey
+      - crypto_pubkey
+    expose:
+      - 6312      # Make sure this matches the PORT env variable
 secrets:
   cert:
     file: ./Secrets/cert.pem
