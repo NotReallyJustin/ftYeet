@@ -88,6 +88,11 @@ function keygen(pubkeyPath, privkeyPath, encryptAlg, options)
         throw `Error when generating keys: unsupported private key encoding type ${options.privateKeyEncoding.type}.`
     }
 
+    if (options.privateKeyEncoding.cipher != undefined && !cryptoUtil.supportedPrivKeyCiphers.includes(options.privateKeyEncoding.cipher))
+    {
+        throw "Error when generating keys: Unsupported cipher to encrypt private keys. If you're using chacha20-poly1305 or aes-256-gcm, sadly Node doesn't support that.";
+    }
+
     // Generate keypairs + write them to files
     let keyPair = cryptoUtil.genKeyPair(encryptAlg, options);
     let pubKeyBuff = cryptoUtil.keyToBin(keyPair.publicKey, options.publicKeyEncoding.format);

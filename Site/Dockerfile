@@ -23,8 +23,6 @@ RUN --mount=type=bind,source=Site/package.json,target=package.json \
 
 # Run the actual site - Copy from previous stages
 FROM node:${NODE_VERSION}-alpine
-ARG FWGROUPID
-ARG FWGROUPNAME
 WORKDIR /usr/src/app/Site
 
 COPY --from=build-site /usr/src/app/Site/ /usr/src/app/Site/

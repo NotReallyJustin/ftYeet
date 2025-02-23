@@ -26,7 +26,7 @@ import {
 export { supportedCiphers, supportedAsymmetrics, secureKeyGen, zeroBuffer, symmetricDecrypt, symmetricEncrypt, secureSign, secureVerify, compatPrivKE, compatPubKE, genKeyPair, 
     keyEncodingFormats, keyEncodingTypes, supportedHashes, genHMAC, fromFileSyntaxAsymm, toFileSyntaxAsymm, fromFileSyntaxSymm, toFileSyntaxSymm, genAsymmCryptosystem,
     pubKeyType, base64ToPubKey, keyToBase64, genPwdHash, verifyPwdHash, fromFileConstruct, toFileConstruct, genPrivKeyObject, genPubKeyObject,
-    keyToBin, genHash }
+    keyToBin, genHash, supportedPrivKeyCiphers }
 
 /**
  * Verifies a file name to ensure it doesn't contain / \ .. : * ? < > | &. Also make sure it's less than 30 characters.
@@ -42,6 +42,14 @@ const verifyFileName = (fileName) => fileName.length <= 30 && !/(\\|\/|\.\.|:|\*
 const supportedCiphers = [
     'chacha20-poly1305',
     'aes-256-gcm',
+    'aes-256-cbc'
+]
+
+/**
+ * List of supported ciphers to encrypt private keys with.
+ * It's here because for some reason chacha20-poly1305 and aes-256-gcm doesn't with Node
+ */
+const supportedPrivKeyCiphers = [
     'aes-256-cbc'
 ]
 
@@ -349,8 +357,14 @@ const genKeyPair = (encryptAlg, options) => {
     {
         throw "Please provide a public key encoding. If you can't figure this out, use `compatPrivKE`.";
     }
+
+    if (options.privateKeyEncoding.cipher != undefined && !supportedPrivKeyCiphers.includes(options.privateKeyEncoding.cipher))
+    {
+        throw "Unsupported cipher to encrypt private keys. If you're using chacha20-poly1305 or aes-256-gcm, sadly Node doesn't support that.";
+    }
     
     // If you're using compatPubKE or compatPrivKE, you should have a string here as your return value.
+    // console.log(options)
     let keyPair = generateKeyPairSync(encryptAlg, options);
     return keyPair;
 }

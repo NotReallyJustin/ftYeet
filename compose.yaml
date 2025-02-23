@@ -20,8 +20,8 @@ services:
       PGPORT: 5432      # Make sure these env vars match with the db service below
       QUERYTIMEOUT: 10000
       CONNECTIONTIMEOUT: 5000
-      FWGROUPID: 1010   # Make sure this matches with build args
-      FWGROUPNAME: filewrite    # Make sure this matches with build args
+      # FWGROUPID: 1010   # Make sure this matches with build args
+      # FWGROUPNAME: filewrite    # Make sure this matches with build args
     secrets:
       - cert
       - server_privkey
@@ -42,10 +42,8 @@ services:
     environment:
       POSTGRES_DB: main
       POSTGRES_PASSWORD_FILE: /run/secrets/db_password
-    ports: 
-      - 5432:5432
-    # expose:
-    #   - 5432
+    expose:
+      - 5432
     healthcheck:
       test: [ "CMD", "pg_isready" ]
       interval: 10s
@@ -58,9 +56,23 @@ secrets:
   server_privkey:
     file: ./Secrets/privKey.pem
   server_privkey_pwd:
-    file: ./Secrets/privKeyPwd.txt
+    file: ./Secrets/privKeyPwd.txt      # This too
   db_password:
-    file: ./Secrets/dbPassword.txt      # Set this to Brock Purdy or smth
+    file: ./Secrets/dbPassword.txt      # Set this to Brock Purdy or smth - encrypt this or set to env?
+  crypto_key_password:
+    file: ./Secrets/cryptoKeyPwd.txt    # Password for our crypto keys - encrypt this or set to env in prod. Set to Nick Bosa or smth
+  crypto_pubkey_sign:
+    file: ./Secrets/cryptoPubKeySign.pem
+  crypto_privkey_sign:
+    file: ./Secrets/cryptoPrivKeySign.pem
+  crypto_cert:
+    file: ./Secrets/cryptoCert.pem
+  crypto_cert_privkey:
+    file: ./Secrets/cryptoHTTPSKey.pem
+  crypto_pubkey:
+    file: ./Secrets/cryptoPubKey.pem
+  crypto_privkey:
+    file: ./Secrets/cryptoPrivKey.pem
 
 # The commented out section below is an example of how to define a PostgreSQL
 # database that your application can use. `depends_on` tells Docker Compose to

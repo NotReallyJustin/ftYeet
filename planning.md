@@ -291,13 +291,16 @@ GET: https://api.ftyeet.something/download
 
 ## Containerization
 * Docker - not because it's trendy but because I really don't want someone to upload and then execute a script that modifies `/etc/shadow` or smth
-* Follow <a href="https://cheatsheetseries.owasp.org/cheatsheets/Docker_Security_Cheat_Sheet.html#:~:text=Docker%20is%20the%20most%20popular,directly%20on%20the%20host%20system.">this</a>
+* Follow <a href="https://cheatsheetseries.owasp.org/cheatsheets/Docker_Security_Cheat_Sheet.html#:~:text=Docker%20is%20the%20most%20popular,directly%20on%20the%20host%20system.">this</a> ✅
 * We're going to use two containers to isolate the encryption/private key signing process from the ftYeet server
     * Kinda mad I didn't think of this earlier lol
     * Can't access the private key files directly if they're basically on two different file systems (well... different volumes)
-* Use a bridge network driver 🙂 This acts as a firewall! Only the two containers can talk to each other
-* Docker compose up?
-    * Add SQL server in here too
+    * Tunneled under HTTPS for double encryption just in case something happens
+    * Encrypted/Decrypted text can be in HTTPS body
+* Use a bridge network driver 🙂 This acts as a firewall! Only the two containers can talk to each other ✅
+* Docker compose up? ✅
+    * Add SQL server in here too ✅
+    * Add Crypto Server 
 
 ## Future Plans
 * Prevent bots from abusing file upload (we only have so much space)
@@ -309,3 +312,4 @@ GET: https://api.ftyeet.something/download
 
 ## Next project idea
 * Lowkey I want to write a script that prevents a user like apache from doing ANYTHING other than serving a website
+* 

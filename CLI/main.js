@@ -41,7 +41,7 @@ program
     .option('-p, --public-exponent [number]', 'exponent for RSA; defaults to 0x10001', parseInt, 0x1001)
     .option('-d, --divisor-length [number]', 'size of q in bits (for DSA)', parseInt, 256)
     .option('-c, --named-curve [curve name]', 'name of the curve to use for EC-based algs (ie. "secp256k1", "prime256v1")')
-    .option('-k, --privatekey-cipher [cipher name]', 'symmetric cipher to encrypt private key file with. Must be used with -o')
+    .option('-k, --privatekey-cipher [aes-256-cbc]', 'symmetric cipher to encrypt private key file with. Must be used with -o')
     .option('-o, --passphrase [password]', 'passphrase to encrypt private key file with. Must be used with -k')
     .action((options) => {
         let algorithm = options.algorithm;
