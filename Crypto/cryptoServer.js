@@ -4,7 +4,7 @@
     IPC is done by tunneling the "protocol" under HTTPS.
 */
 
-import express from 'express';
+import express, { response } from 'express';
 import * as path from 'path';
 import { createServer } from 'https';
 import { readFileSync } from 'fs';
@@ -19,7 +19,27 @@ const httpsServer = createServer({
 }, ipc);
 
 ipc.get("/", (request, response) => {
+    response.status(404).send("Try again bozo. Use either symmEnc, symmDec, sign, asymmEnc.");
+});
 
+ipc.get("/symmEnc", (request, response) => {
+
+});
+
+ipc.get("/symmDec", (request, response) => {
+
+});
+
+ipc.get("/sign", (request, response) => {
+
+});
+
+ipc.get("/asymmEnc", (request, response) => {
+
+});
+
+apiRouter.all("*", (request, response) => {
+    response.status(404).send("Not found.");
 });
 
 // Listen only for HTTPS.
