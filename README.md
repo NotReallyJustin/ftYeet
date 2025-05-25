@@ -21,8 +21,24 @@ Here's a one-liner to self-signed key and cert files. Add `-nodes` at the end to
 ```bash
 openssl req -x509 -newkey rsa:4096 -keyout [privateKeyFilePath] -out [certPath] -sha512 -days 365
 ```
-* Create `Secrets/privKey.pem` and `Secrets/cert.pem`. These are X509 certs and key files for the web server and HTTPS tunnel
-    * If there's a password for the private key file, put it in `Secrets/dbPassword.txt`
+* Create `Secrets/privKey.pem` and `Secrets/cert.pem`. These are X509 certs and key files for the web server and ftYeet protocol's HTTPS tunnel
+    * If there's a password for the private key file, put it in `Secrets/privKeyPwd.txt`
 * Create `Secrets/dbPassword.txt` with the PostgreSQL database password.
 * Create `Secrets/dbPrivKey.pem` and `Secrets/dbCert.pem`. These are the X509 certs and key files for the PostgreSQL server.
     * If there's a password, put it in `Secrets/dbPrivKeyPwd.txt`
+* Create `Secrets/cryptoCert.pem` and `Secrets/cryptoHTTPSey.pem`. These are X509 certs for the crypto HTTPS tunnel.
+    * If there's a password for the private key file, put it in `cryptoCertKeyPwd.txt`
+* Create `Secrets/cryptoPrivKey.pem` and `Secrets/cryptoPubKey.pem`. This is the key the Crypto "HSM" will use to encrypt files
+    * If there's a password for the private key file, put it in `cryptoEncKeyPwd.txt`
+* Create `Secrets/cryptoPrivKeySign.pem` and `Secrets/cryptoPubKeySign.pem`. This is the key the "HSM" will use to sign files
+    * If there's a password for the private key file, put it in `cryptoSignKeyPwd.txt`
+* Create `Secrets/cryptoSymmPwd.txt`. This is the password used for symmetric key encryption in the Crypto "HSM."
+<br >
+Don't worry, you don't need to remember any of these passwords later down the line. Docker will take care of everything for you.
+<br>
+Alternatively, if you don't want to manually create all this, run `genSecrets.ps1`. `genSecrets.ps1` will assume that you *DON'T* know what you're doing and force you to create a password for (and encrypt) all of the private keys out there. Sample usage:
+
+```ps1
+# Add -ExecutionPolicy Bypass if needed
+powershell.exe .\genSecrets.ps1 -PrivKeyPwd "CMC" -DBPrivKeyPwd "JsxDrt" -CryptoCertKeyPwd "Scion" -CryptoEncKeyPwd "CharlesChadwick" -CryptoSignKeyPwd "DanteCastello" -CryptoSymmPwd "If_Any_Of_My-DND_Fellas_Are_Lurking_Here_and-Recognize_these_names_Hi!"
+```
