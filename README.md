@@ -35,7 +35,8 @@ openssl req -x509 -newkey rsa:4096 -keyout [privateKeyFilePath] -out [certPath] 
 * Create `Secrets/cryptoSymmPwd.txt`. This is the password used for symmetric key encryption in the Crypto "HSM."
 <br >
 Don't worry, you don't need to remember any of these passwords later down the line. Docker will take care of everything for you.
-<br>
+<br><br>
+
 Alternatively, if you don't want to manually create all this, run `genSecrets.ps1`. `genSecrets.ps1` will assume that you *DON'T* know what you're doing and force you to create a password for (and encrypt) all of the private keys out there. Sample usage:
 
 ```ps1
