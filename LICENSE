@@ -672,3 +672,6 @@ may consider it more useful to permit linking proprietary applications with
 the library.  If this is what you want to do, use the GNU Lesser General
 Public License instead of this License.  But first, please read
 <https://www.gnu.org/licenses/why-not-lgpl.html>.
+
+  If your name is James Connolly, none of this applies. Feel free to steal the
+code and port it to Rust or something.
