@@ -26,7 +26,7 @@ openssl req -x509 -newkey rsa:4096 -keyout [privateKeyFilePath] -out [certPath] 
 * Create `Secrets/dbPassword.txt` with the PostgreSQL database password.
 * Create `Secrets/dbPrivKey.pem` and `Secrets/dbCert.pem`. These are the X509 certs and key files for the PostgreSQL server.
     * If there's a password, put it in `Secrets/dbPrivKeyPwd.txt`
-* Create `Secrets/cryptoCert.pem` and `Secrets/cryptoHTTPSey.pem`. These are X509 certs for the crypto HTTPS tunnel.
+* Create `Secrets/cryptoCert.pem` and `Secrets/cryptoHTTPKey.pem`. These are X509 certs for the crypto HTTPS tunnel.
     * If there's a password for the private key file, put it in `cryptoCertKeyPwd.txt`
 * Create `Secrets/cryptoPrivKey.pem` and `Secrets/cryptoPubKey.pem`. This is the key the Crypto "HSM" will use to encrypt files
     * If there's a password for the private key file, put it in `cryptoEncKeyPwd.txt`
@@ -41,5 +41,7 @@ Alternatively, if you don't want to manually create all this, run `genSecrets.ps
 
 ```ps1
 # Add -ExecutionPolicy Bypass if needed
-powershell.exe .\genSecrets.ps1 -PrivKeyPwd "CMC" -DBPrivKeyPwd "JsxDrt" -CryptoCertKeyPwd "Scion" -CryptoEncKeyPwd "CharlesChadwick" -CryptoSignKeyPwd "DanteCastello" -CryptoSymmPwd "If_Any_Of_My-DND_Fellas_Are_Lurking_Here_and-Recognize_these_names_Hi!"
+powershell.exe .\genSecrets.ps1 -PrivKeyPwd "CMC" -DBPwd "TralaleroTralala" -DBPrivKeyPwd "JsxDrt" -CryptoCertKeyPwd "Scion" -CryptoEncKeyPwd "CharlesChadwick" -CryptoSignKeyPwd "DanteCastello" -CryptoSymmPwd "If_Any_Of_My-DND_Fellas_Are_Lurking_Here_and-Recognize_these_names_Hi!"
 ```
+
+If you don't have OpenSSL, install it here: https://www.openssl.org/
