@@ -42,7 +42,7 @@ fi;
 openssl req -x509 -subj "/C=US/ST=NY/L=NYC/O=ftYeet Inc/CN=ftYeet/" -passout "pass:${PrivKeyPwd}" -sha256 -days 365 -newkey rsa:2048 -keyout Secrets/privKey.pem -out Secrets/cert.pem;
 echo -n $PrivKeyPwd > ./Secrets/privKeyPwd.txt;
 
-echo -n $DBPwd > ./Secrets/dbPassword.txt
+echo -n $DBPwd > ./Secrets/dbPassword.txt;
 
 openssl req -x509 -subj "/C=US/ST=NY/L=NYC/O=ftYeet Inc/CN=ftYeet/" -passout "pass:${DBPrivKeyPwd}" -sha256 -days 365 -newkey rsa:2048 -keyout Secrets/dbPrivKey.pem -out Secrets/dbCert.pem;
 echo -n $DBPrivKeyPwd > ./Secrets/dbPrivKeyPwd.txt;
