@@ -46,7 +46,7 @@ powershell.exe .\genSecrets.ps1 -PrivKeyPwd "CMC" -DBPwd "TralaleroTralala" -DBP
 
 If you're using Linux or WSL, you can run this instead:
 ```bash
-bash ./genSecrets.sh PrivKeyPwd DBPwd DBPrivKeyPwd CryptoCertKeyPwd CryptoEncKeyPwd CryptoSignKeyPwd CryptoSymmPwd"
+bash ./genSecrets.sh PrivKeyPwd DBPwd DBPrivKeyPwd CryptoCertKeyPwd CryptoEncKeyPwd CryptoSignKeyPwd CryptoSymmPwd
 ```
 
 If you don't have OpenSSL, install it here: https://www.openssl.org/
