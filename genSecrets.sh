@@ -39,19 +39,26 @@ if [[ ! -d "./Secrets" ]]; then
 fi;
 
 # Generate X509 certs
-openssl req -x509 -subj "/C=US/ST=NY/L=NYC/O=ftYeet Inc/CN=ftYeet/" -passout "pass:${PrivKeyPwd}" -sha256 -days 365 -newkey rsa:2048 -keyout Secrets/privKey.pem -out Secrets/cert.pem 
-echo -n $PrivKeyPwd > ./Secrets/privKeyPwd.txt
+openssl req -x509 -subj "/C=US/ST=NY/L=NYC/O=ftYeet Inc/CN=ftYeet/" -passout "pass:${PrivKeyPwd}" -sha256 -days 365 -newkey rsa:2048 -keyout Secrets/privKey.pem -out Secrets/cert.pem;
+echo -n $PrivKeyPwd > ./Secrets/privKeyPwd.txt;
 
 echo -n $DBPwd > ./Secrets/dbPassword.txt
 
-openssl req -x509 -subj "/C=US/ST=NY/L=NYC/O=ftYeet Inc/CN=ftYeet/" -passout "pass:${DBPrivKeyPwd}" -sha256 -days 365 -newkey rsa:2048 -keyout Secrets/dbPrivKey.pem -out Secrets/dbCert.pem 
-echo -n $DBPrivKeyPwd > ./Secrets/dbPrivKeyPwd.txt
+openssl req -x509 -subj "/C=US/ST=NY/L=NYC/O=ftYeet Inc/CN=ftYeet/" -passout "pass:${DBPrivKeyPwd}" -sha256 -days 365 -newkey rsa:2048 -keyout Secrets/dbPrivKey.pem -out Secrets/dbCert.pem;
+echo -n $DBPrivKeyPwd > ./Secrets/dbPrivKeyPwd.txt;
 
-openssl req -x509 -subj "/C=US/ST=NY/L=NYC/O=ftYeet Inc/CN=ftYeet/" -passout "pass:${CryptoCertKeyPwd}" -sha256 -days 365 -newkey rsa:2048 -keyout Secrets/cryptoHTTPKey.pem -out Secrets/cryptoCert.pem 
-echo -n $CryptoCertKeyPwd > ./Secrets/cryptoCertKeyPwd.txt
+openssl req -x509 -subj "/C=US/ST=NY/L=NYC/O=ftYeet Inc/CN=ftYeet/" -passout "pass:${CryptoCertKeyPwd}" -sha256 -days 365 -newkey rsa:2048 -keyout Secrets/cryptoHTTPKey.pem -out Secrets/cryptoCert.pem;
+echo -n $CryptoCertKeyPwd > ./Secrets/cryptoCertKeyPwd.txt;
 
 # Generate two keypairs for our "HSM"
-# aes[128|192|256]       Alias for aes-[128|192|256]-cbc --> from OpenSSL
-openssl genrsa -aes256 -passout "pass:${CryptoEncKeyPwd}"  -out ./Secrets/cryptoPrivKey.pem 2048
-openssl rsa -in ./Secrets/cryptoPrivKey.pem -passin "pass:${CryptoEncKeyPwd}" -outform PEM -pubout -out ./Secrets/cryptoPubKey.pem
-echo -n $CryptoEncKeyPwd > ./Secrets/cryptoEncKeyPwd.txt
+# -aes[128|192|256]       Alias for aes-[128|192|256]-cbc --> from OpenSSL
+openssl genrsa -aes256 -passout "pass:${CryptoEncKeyPwd}"  -out ./Secrets/cryptoPrivKey.pem 2048;
+openssl rsa -in ./Secrets/cryptoPrivKey.pem -passin "pass:${CryptoEncKeyPwd}" -outform PEM -pubout -out ./Secrets/cryptoPubKey.pem;
+echo -n $CryptoEncKeyPwd > ./Secrets/cryptoEncKeyPwd.txt;
+
+openssl genpkey -algorithm ed25519 -aes-256-cbc -pass "pass:${CryptoSignKeyPwd}" -out ./Secrets/cryptoPrivKeySign.pem;
+openssl pkey -in ./Secrets/cryptoPrivKeySign.pem -passin "pass:${CryptoSignKeyPwd}" -outform PEM -pubout -out ./Secrets/cryptoPubKey.pem;
+echo -n $CryptoSignKeyPwd > ./Secrets/cryptoSignKeyPwd.txt;
+
+echo -n $CryptoSymmPwd > Secrets/cryptoSymmPwd.txt;
+echo "Done.";
