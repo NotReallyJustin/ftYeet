@@ -309,6 +309,7 @@ GET: https://api.ftyeet.something/download
 * 🚨 Lowkey thinking of just flat out not giving users permission to upload a file without a password because c'mon dude at that point why even bother 
 * 2FA? Lowkey this is probably overkill
 * Node.js stand alone executables
+* Buy ftyeet domain. As of now, this DNS is getting resolved locally which is not rly a good thing lmao
 
 ## Next project idea
 * Lowkey I want to write a script that prevents a user like apache from doing ANYTHING other than serving a website

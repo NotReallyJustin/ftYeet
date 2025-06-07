@@ -246,7 +246,7 @@ const symmetricEncrypt = (password, hmacPassword, plaintext, encryptAlg, ivLengt
 
 /**
  * Symmetrically decrypts a binary buffer. This also validates with an AuthTag and HMAC before even attempting to decrypt.
- * The plaintext is returned a binary because presumably, it'll be written to a file. You are responsible for zeroing the buffer and converting the binary if needed
+ * The plaintext is returned as a binary because presumably, it'll be written to a file. You are responsible for zeroing the buffer and converting the binary if needed
  * @param {String} password User password used to generate keys during the encryption step.
  * @param {String} hmacPassword The "authentication code" you put into the KDF to generate a key for HMACs when encrypting. If it's undefined, we use `password`. 
  * @param {Buffer} ciphertext Binary ciphertext to decrypt. ✏️ You could free this buffer if you want to

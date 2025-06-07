@@ -68,6 +68,7 @@ services:
       - crypto_cert_privkey
       - crypto_privkey
       - crypto_pubkey
+      - crypto_hmac_password
     expose:
       - 6312      # Make sure this matches the PORT env variable
 secrets:
@@ -97,3 +98,5 @@ secrets:
     file: ./Secrets/cryptoPubKey.pem
   crypto_privkey:
     file: ./Secrets/cryptoPrivKey.pem
+  crypto_hmac_password:
+    file: ./Secrets/cryptoHmacPwd.txt  # Password to HMAC stuff in crypto server

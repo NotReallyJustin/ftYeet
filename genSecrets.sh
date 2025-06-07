@@ -2,7 +2,7 @@
 # This is genSecrets.ps1, but it's a bash script for the Linux and WSL people
 
 # Granted bash doesn't hold your hand when it comes to params, so this does require you to slightly know what you're doing
-# Usage: ./genSecrets.sh <PrivKeyPwd> <DBPwd> <DBPrivKeyPwd> <CryptoCertKeyPwd> <CryptoEncKeyPwd> <CryptoSignKeyPwd> <CryptoSymmPwd>
+# Usage: ./genSecrets.sh <PrivKeyPwd> <DBPwd> <DBPrivKeyPwd> <CryptoCertKeyPwd> <CryptoEncKeyPwd> <CryptoSignKeyPwd> <CryptoSymmPwd> <CryptoHMACPwd>
 
 # I know bash wants these in uppercase but I'm making things portable so we're just gonna ignore the convention stuff
 PrivKeyPwd=$1;
@@ -12,6 +12,7 @@ CryptoCertKeyPwd=$4;
 CryptoEncKeyPwd=$5;
 CryptoSignKeyPwd=$6;
 CryptoSymmPwd=$7;
+CryptoHMACPwd=$8;
 
 function abort() {
     echo $1 >&2;
@@ -61,4 +62,6 @@ openssl pkey -in ./Secrets/cryptoPrivKeySign.pem -passin "pass:${CryptoSignKeyPw
 echo -n $CryptoSignKeyPwd > ./Secrets/cryptoSignKeyPwd.txt;
 
 echo -n $CryptoSymmPwd > Secrets/cryptoSymmPwd.txt;
+echo -n $CryptoHMACPwd > Secrets/cryptoHMACPwd.txt;
+
 echo "Done.";

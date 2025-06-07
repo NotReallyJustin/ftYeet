@@ -24,6 +24,9 @@ param (
 
     [Parameter(Mandatory = $true)]
     [string]$CryptoSymmPwd
+
+    [Parameter(Mandatory = $true)]
+    [string]$CryptoHMACPwd
 )
 
 function Abort {
@@ -80,5 +83,6 @@ node CLI/main.js keygen -a ed25519 -v Secrets/cryptoPrivKeySign.pem -u Secrets/c
 $CryptoSignKeyPwd | Out-File -FilePath Secrets/cryptoSignKeyPwd.txt -NoNewline
 
 $CryptoSymmPwd | Out-File -FilePath Secrets/cryptoSymmPwd.txt -NoNewline
+$CryptoHMACPwd | Out-File -FilePath Secrets/cryptoHMACPwd.txt -NoNewline
 
 echo "Done.";
