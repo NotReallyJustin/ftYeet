@@ -458,10 +458,10 @@ function uploadAsymm(filePath, signKeyPath, signKeyPwd, encKeyPath, dsaPadding, 
 
         let fileConstruct = cryptoUtil.toFileConstruct(basename(filePath), Buffer.from(plaintext, 'utf-8'));
         let encrypted = publicEncrypt({key: encKeyObject, oaepHash: 'sha3-512', padding: encPadding}, fileConstruct);
-        let signature = cryptoUtil.secureSign('sha3-512', encrypted, {key: signKeyObject, passphrase: signKeyPwd, padding: dsaPadding});
+        let signature = cryptoUtil.secureSign('sha3-512', encrypted, signKeyObject);
 
         let cryptosystem = cryptoUtil.genAsymmCryptosystem(signature, dsaPadding, encPadding, 'sha3-512');
-        fileSyntax = cryptoUtil.toFileSyntaxAsymm(cryptosystem, encrypted, {key: signKeyObject, passphrase: signKeyPwd}, 'CLI');
+        fileSyntax = cryptoUtil.toFileSyntaxAsymm(cryptosystem, encrypted, signKeyObject, 'CLI');
     }
     catch(err)
     {
@@ -595,7 +595,7 @@ function downloadAsymm(dirPath, url, verifyKeyPath, verifyKeyPwd, decKeyPath, de
     }
 
     // Fetch file syntax
-    let restored = cryptoUtil.fromFileSyntaxAsymm({key: verifyKeyObject, passphrase: verifyKeyPwd}, fileSyntax);
+    let restored = cryptoUtil.fromFileSyntaxAsymm(verifyKeyObject, fileSyntax);
     let plaintext = privateDecrypt({key: decKeyObject, oaepHash: restored.cryptoSystem.oaepHash, padding: restored.cryptoSystem.encryptPadding, passphrase: decKeyPwd}, restored.data);
     let unFileConstruct = cryptoUtil.fromFileConstruct(plaintext.toString('utf-8'));
 
