@@ -59,16 +59,17 @@ services:
     environment:
       PORT: 6312
     secrets:
-      - crypto_sign_key_password
-      - crypto_enc_key_password
-      - crypto_cert_key_password
-      - crypto_pubkey_sign
-      - crypto_privkey_sign
-      - crypto_cert
-      - crypto_cert_privkey
-      - crypto_privkey
-      - crypto_pubkey
-      - crypto_hmac_password
+      - crypto_sign_key_password  # ✅
+      - crypto_enc_key_password # ✅
+      - crypto_cert_key_password  # ✅
+      - crypto_pubkey_sign    # ✅  
+      - crypto_privkey_sign # ✅
+      - crypto_cert         # ✅
+      - crypto_cert_privkey  # ✅
+      - crypto_privkey  # ✅
+      - crypto_pubkey  # ✅
+      - crypto_symm_password  # ✅
+      - crypto_hmac_password  # ✅
     expose:
       - 6312      # Make sure this matches the PORT env variable
 secrets:
@@ -98,5 +99,7 @@ secrets:
     file: ./Secrets/cryptoPubKey.pem
   crypto_privkey:
     file: ./Secrets/cryptoPrivKey.pem
+  crypto_symm_password:
+    file: ./Secrets/cryptoSymmPwd.txt  # Password to do symmetric enc in crypto server
   crypto_hmac_password:
     file: ./Secrets/cryptoHmacPwd.txt  # Password to HMAC stuff in crypto server

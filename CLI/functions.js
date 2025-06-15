@@ -557,7 +557,7 @@ function downloadAsymm(dirPath, url, verifyKeyPath, verifyKeyPwd, decKeyPath, de
     let verifyKey;
     try
     {
-        verifyKey = readFileSync(verifyKeyPath, {encoding: 'binary'});
+        verifyKey = readFileSync(verifyKeyPath);
     }
     catch(err)
     {
@@ -577,7 +577,7 @@ function downloadAsymm(dirPath, url, verifyKeyPath, verifyKeyPwd, decKeyPath, de
     let decKey;
     try
     {
-        decKey = readFileSync(decKeyPath, {encoding: 'binary'});
+        decKey = readFileSync(decKeyPath);
     }
     catch(err)
     {

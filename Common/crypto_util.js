@@ -6,10 +6,10 @@ import {
     sign,
     randomBytes,
     createHash,
-    privateDecrypt,
-    privateEncrypt,
-    publicDecrypt,
-    publicEncrypt,
+    // privateDecrypt,
+    // privateEncrypt,
+    // publicDecrypt,
+    // publicEncrypt,
     verify,
     getCiphers,
     getHashes,
@@ -23,10 +23,12 @@ import {
     KeyObject
 } from 'node:crypto';
 
+import { isKeyObject } from 'node:util/types';
+
 export { supportedCiphers, supportedAsymmetrics, secureKeyGen, zeroBuffer, symmetricDecrypt, symmetricEncrypt, secureSign, secureVerify, compatPrivKE, compatPubKE, genKeyPair, 
     keyEncodingFormats, keyEncodingTypes, supportedHashes, genHMAC, fromFileSyntaxAsymm, toFileSyntaxAsymm, fromFileSyntaxSymm, toFileSyntaxSymm, genAsymmCryptosystem,
     pubKeyType, base64ToPubKey, keyToBase64, genPwdHash, verifyPwdHash, fromFileConstruct, toFileConstruct, genPrivKeyObject, genPubKeyObject,
-    keyToBin, genHash, supportedPrivKeyCiphers }
+    keyToBin, genHash, supportedPrivKeyCiphers, objectToBin, binToObject }
 
 /**
  * Verifies a file name to ensure it doesn't contain / \ .. : * ? < > | &. Also make sure it's less than 30 characters.
@@ -376,9 +378,7 @@ const genKeyPair = (encryptAlg, options) => {
  * Signs the data using the given public/private key.
  * @param {String|undefined} hashAlg Hashing algorithm. Using undefined will leave this up to Node.js (which may very well use something like SHA-1). Do not give users this option explicitly.
  * @param {Buffer} data Data to be signed. You are responsible for zeroing this out later down the line if it's sensitive.
- * @param {{key: String, dsaEncoding: String, padding: Number, passphrase: String}} signKeyObject JSON object with key and other configs (such as padding. Consider using crypto.constants.RSA_PKCS1_PSS_PADDING)
- * @param {String} signKeyObject.passphrase If your private key is encrypted, provide a passphrase
- * @param {String} signKeyObject.key Key for digital signature
+ * @param {KeyObject} signKeyObject JSON KeyObject used to sign the data. This is basically the private key that got passed through `genPrivKeyObject()`.
  * @see https://nodejs.org/api/crypto.html#cryptosignalgorithm-data-key-callback
  * @returns {String} Digital signature (in hex)
  */
@@ -389,15 +389,10 @@ const secureSign = (hashAlg, data, signKeyObject) => {
         throw "HashAlg is not supported by Node.js. We recommend sha3-512.";
     }
 
-    if (signKeyObject.key == undefined)
+    if (!isKeyObject(signKeyObject))
     {
-        throw "Please provide a key to sign.";
+        throw "signKeyObject must be an instance of KeyObject. Remember to run it through `genPrivKeyObject()`.";
     }
-
-    // if (signKeyObject.key.includes("ENCRYPTED") && signKeyObject.passphrase == undefined)
-    // {
-    //     throw "It seems like your (presumably private) key is encrypted. Please provide a passphrase.";
-    // }
     
     let signature;              // Buffer
     try                         // If we can, force sha3-512 or the hashAlg. If the algorithm is uncompromising with its hashes (like ED25519), let it cook.
@@ -992,7 +987,7 @@ const genPrivKeyObject = (privateKey, password, inBinary) => {
                 return createPrivateKey({
                     key: inBinary ? binToKey(privateKey, format) : privateKey,
                     encoding: 'utf-8',
-                    format: format,
+                    format: format,     // PEM or jwk
                     passphrase: password
                 });
             }
@@ -1185,6 +1180,20 @@ const genHash = (data, hashAlg) => {
     hashFunction.update(data);
     return hashFunction.digest('hex');
 }
+
+/**
+ * Converts an object (ie. JSON) to binary.
+ * @param {Object} obj The object to convert to binary
+ * @returns {Buffer} The object, in binary.
+ */
+const objectToBin = (obj) => Buffer.from(JSON.stringify(obj));
+
+/**
+ * Converts a piece of binary to an object (ie. JSON).
+ * @param {Buffer} buffer The binary buffer to convert to an object 
+ * @returns {Object} The object, likely in JSON.
+ */
+const binToObject = (buffer) => JSON.parse(buffer.toString('utf-8'));
 
 // 🛠️ Testing area 
 // const encAlg = 'aes-256-gcm'

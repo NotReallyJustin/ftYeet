@@ -23,7 +23,7 @@ param (
     [string]$CryptoSignKeyPwd,
 
     [Parameter(Mandatory = $true)]
-    [string]$CryptoSymmPwd
+    [string]$CryptoSymmPwd,
 
     [Parameter(Mandatory = $true)]
     [string]$CryptoHMACPwd

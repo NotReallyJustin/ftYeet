@@ -302,6 +302,9 @@ GET: https://api.ftyeet.something/download
     * Add SQL server in here too ✅
     * Add Crypto Server 
 
+## Miscellaneous
+* Crypto Server might not need all the encryption files (ie. public keys) since it has no use for any of them
+
 ## Future Plans
 * Prevent bots from abusing file upload (we only have so much space)
 * Get TLS (certbot for website *if* we can have a domain name --> some self-signed stuff might work temporarily; need to think of how to do it for the FTYeet Protocol)
@@ -310,6 +313,8 @@ GET: https://api.ftyeet.something/download
 * 2FA? Lowkey this is probably overkill
 * Node.js stand alone executables
 * Buy ftyeet domain. As of now, this DNS is getting resolved locally which is not rly a good thing lmao
+* Maybe symmetric enc's cryptosystem should tell us the encryption alg
+* Instead of buffer.from(), consider V8 serialization
 
 ## Next project idea
 * Lowkey I want to write a script that prevents a user like apache from doing ANYTHING other than serving a website
