@@ -6,10 +6,10 @@ import {
     sign,
     randomBytes,
     createHash,
-    // privateDecrypt,
-    // privateEncrypt,
-    // publicDecrypt,
-    // publicEncrypt,
+    privateDecrypt,
+    privateEncrypt,
+    publicDecrypt,
+    publicEncrypt,
     verify,
     getCiphers,
     getHashes,
@@ -423,9 +423,7 @@ const secureSign = (hashAlg, data, signKeyObject) => {
  * Verifies a digital signature using a private/public key
  * @param {String|undefined} hashAlg Hashing algorithm. This must be the same as the hashing algorithm used in the digital signature
  * @param {Buffer} data Data to be verify signature of. You are responsible for zeroing this out later down the line if it's sensitive.
- * @param {KeyObject} verifyKeyObject JSON KeyObject used to verify $signature.
- * @param {String} verifyKeyObject.passphrase If your private key is encrypted, provide a passphrase
- * @param {String} verifyKeyObject.key Key for digital signature
+ * @param {KeyObject} verifyKeyObject JSON KeyObject used to verify $signature. This is what you get when you run `genPubKeyObject()` on the public key.
  * @param {String} signature The digital signature (in hex)
  * @see https://nodejs.org/api/crypto.html#cryptosignalgorithm-data-key-callback
  * @return {Boolean} Whether or not the digital signature is valid
@@ -436,21 +434,11 @@ const secureVerify = (hashAlg, data, verifyKeyObject, signature) => {
     {
         throw "HashAlg is not supported by Node.js. Check to make sure you are using the same one as the hashing algorithm.";
     }
-    
-    if (verifyKeyObject.key == undefined)
-    {
-        throw "Please provide a key to sign.";
-    }
 
     if (!isKeyObject(verifyKeyObject))
     {
         throw "verifyKeyObject must be an instance of KeyObject. Remember to run it through `genPubKeyObject()`.";
     }
-
-    // if (verifyKeyObject.key.includes("ENCRYPTED") && verifyKeyObject.passphrase == undefined)
-    // {
-    //     throw "It seems like your key is encrypted. Please provide a passphrase.";
-    // }
 
     let signatureBuffer = Buffer.from(signature, 'hex');        // Buffer
 
@@ -469,7 +457,7 @@ const secureVerify = (hashAlg, data, verifyKeyObject, signature) => {
         }
         catch(err2)
         {
-            throw `Error when verifying: ${err2}.\n Usually this occurs because of a wrong passphrase when decrypting the private key. ${err2.stack}`;
+            throw `Error when verifying: ${err2}.\n Usually this occurs because the private key is not decrypted. Make sure you pass in a KeyObject. ${err2.stack}`;
         }
     }
     
@@ -1253,11 +1241,11 @@ const binToObject = (buffer) => JSON.parse(buffer.toString('utf-8'));
 
 // let fileConstruct = toFileConstruct("JoshAllen.md", Buffer.from("Touchdown San Francisco!", 'utf-8'));
 // let encrypted = publicEncrypt({key: pubKey, oaepHash: 'sha3-512', padding: constants.RSA_PKCS1_OAEP_PADDING}, Buffer.from(fileConstruct, 'utf-8'));
-// // let decrypted = privateDecrypt({key: keyPair.privateKey, oaepHash: 'sha3-512', padding: constants.RSA_PKCS1_OAEP_PADDING, passphrase: 'CMC'}, encrypted);
 
 // let signature = secureSign('sha3-512', encrypted, privKey);
 // // console.log(signature.length)
 // // let isValid = secureVerify('sha3-512', Buffer.from("hello", "ascii"), pubKey, signature);
+// // console.log(isValid);
 
 // let cryptosystem = genAsymmCryptosystem(signature, constants.RSA_PKCS1_PSS_PADDING, constants.RSA_PKCS1_OAEP_PADDING, 'sha3-512');
 // let fileSyntax = toFileSyntaxAsymm(cryptosystem, encrypted, privKey, 'CLI');
