@@ -9,6 +9,11 @@ ENV NODE_ENV=production
 WORKDIR /usr/src/app
 COPY Common/ /usr/src/app/Common/
 
+# Copy one file in Crypto
+FROM node:${NODE_VERSION}-alpine AS build-Crypto
+WORKDIR /usr/src/Crypto
+COPY Crypto/cryptoFunc.js /usr/src/Crypto/cryptoFunc.js
+
 # Copy Site
 FROM node:${NODE_VERSION}-alpine AS build-site
 WORKDIR /usr/src/app
@@ -27,8 +32,9 @@ WORKDIR /usr/src/app/Site
 
 COPY --from=build-site /usr/src/app/Site/ /usr/src/app/Site/
 COPY --from=build-common /usr/src/app/Common/ /usr/src/app/Common/
+COPY --from=build-Crypto /usr/src/Crypto/ /usr/src/app/Site/Crypto/
 
-# Make a directory that node can wrote
+# Make a directory that node can write to
 RUN mkdir /usr/src/app/Site/files
 
 # x permission for dirs == you can $cd into it

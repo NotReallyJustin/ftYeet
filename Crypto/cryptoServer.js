@@ -8,8 +8,8 @@ import express from 'express';
 import { createServer } from 'https';
 import { readFileSync } from 'fs';
 
-import { symmEnc, symmDec, sign } from './cryptoFunc';
-import { zeroBuffer, genPrivKeyObject } from '../Common/crypto_util';
+import { symmEnc, symmDec, sign, asymmDec } from './cryptoFunc';
+import { zeroBuffer, genPrivKeyObject, genPubKeyObject } from '../Common/crypto_util';
 import { KeyObject } from 'crypto';
 
 const ipc = express();
@@ -178,9 +178,24 @@ ipc.get("/sign", (request, response) => {
     }
 });
 
-// TODO: Maybe this should be asymmDec ngl o.o
-ipc.get("/asymmEnc", (request, response) => {
+// asymmEnc is not implemented here, since the external servers will have access to the public key.
+// Since they have access to the public key, it makes no sense to have the HSM perform the operation and slow down ftYeet via the IPC.
+ipc.get("/asymmDec", (request, response) => {
+    
+    try
+    {
+        let decrypted = asymmDec(request.body, asymmPrivKeyObj);
 
+        response.setHeader('Content-Type', 'application/octet-stream');
+        response.send(decrypted);
+
+        // Zero out the decrypted data since the "client" has a copy now
+        zeroBuffer(decrypted);
+    }
+    catch(err)
+    {
+        response.status(500).send(err);
+    }
 });
 
 // ---------------- Router Dead End ------------------------------------

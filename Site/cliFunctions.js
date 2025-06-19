@@ -5,10 +5,15 @@ import * as path from 'path';
 import * as fileUtil from '../Common/file_util.js';
 import { getFile, logSymmFile, runQuery } from './psql.js';
 import { randomBytes } from 'crypto';
+import { asymmEnc, verify, symmDec, symmEnc } from '../Crypto/cryptoFunc.js';
+
 export { genURL, uploadSymm, checkURL, downloadSymm }
 
 // ⭐ Formatting note: I use () => {} if there's no side effects. function() {} is used when there is a side effect
 
+/**
+ * URL of the crypto server (HSM)
+ */
 const TEMP_PWD = "Temporary";
 const FILE_DIR = "./files/";
 
@@ -85,6 +90,7 @@ const checkURL = async (url) => {
 function uploadSymm(data, expireTime, burnOnRead, pwdHash, url)
 {
     // Encrypt the data again (by converting it to - you guessed it - another file syntax!). In the future, this is gonna get moved
+    // TODO: Adapt this to HSM.js
     let symmEnc = cryptoUtil.symmetricEncrypt(TEMP_PWD, TEMP_PWD, data, 'chacha20-poly1305', 12);
     let ciphertext = symmEnc.ciphertext;
     delete symmEnc.ciphertext;
@@ -187,6 +193,7 @@ function downloadSymm(url, pwdHash)
 
                 try
                 {
+                    // TODO: Readapt this to HSM.js
                     decrypted = cryptoUtil.symmetricDecrypt(TEMP_PWD, TEMP_PWD, restored.data, 'chacha20-poly1305', restored.cryptoSystem);
                 }
                 catch(err)

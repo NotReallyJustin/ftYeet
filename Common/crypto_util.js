@@ -23,8 +23,6 @@ import {
     KeyObject
 } from 'node:crypto';
 
-import { isKeyObject } from 'node:util/types';
-
 export { supportedCiphers, supportedAsymmetrics, secureKeyGen, zeroBuffer, symmetricDecrypt, symmetricEncrypt, secureSign, secureVerify, compatPrivKE, compatPubKE, genKeyPair, 
     keyEncodingFormats, keyEncodingTypes, supportedHashes, genHMAC, fromFileSyntaxAsymm, toFileSyntaxAsymm, fromFileSyntaxSymm, toFileSyntaxSymm, genAsymmCryptosystem,
     pubKeyType, base64ToPubKey, keyToBase64, genPwdHash, verifyPwdHash, fromFileConstruct, toFileConstruct, genPrivKeyObject, genPubKeyObject,
@@ -378,7 +376,10 @@ const genKeyPair = (encryptAlg, options) => {
  * Signs the data using the given public/private key.
  * @param {String|undefined} hashAlg Hashing algorithm. Using undefined will leave this up to Node.js (which may very well use something like SHA-1). Do not give users this option explicitly.
  * @param {Buffer} data Data to be signed. You are responsible for zeroing this out later down the line if it's sensitive.
- * @param {KeyObject} signKeyObject JSON KeyObject used to sign the data. This is basically the private key that got passed through `genPrivKeyObject()`.
+ * @param {{key: KeyObject, dsaEncoding: String, padding: Number, passphrase: String}} signKeyObject JSON object with key and other configs (such as padding. Consider using crypto.constants.RSA_PKCS1_PSS_PADDING)
+ * @param {String} signKeyObject.passphrase If your private key is encrypted, provide a passphrase. Might be redundant at times with KeyObject if implementing serverside.
+ * @param {KeyObject} signKeyObject.key Key for digital signature. You should pass this through `genPrivKeyObject()` or `genPubKeyObject()` to be safe.
+ * @param {String} signKeyObject.dsaEncoding DSA encoding type. This defaults to der (the right option)
  * @see https://nodejs.org/api/crypto.html#cryptosignalgorithm-data-key-callback
  * @returns {String} Digital signature (in hex)
  */
@@ -389,10 +390,15 @@ const secureSign = (hashAlg, data, signKeyObject) => {
         throw "HashAlg is not supported by Node.js. We recommend sha3-512.";
     }
 
-    if (!isKeyObject(signKeyObject))
+    if (signKeyObject.key == undefined)
     {
-        throw "signKeyObject must be an instance of KeyObject. Remember to run it through `genPrivKeyObject()`.";
+        throw "Please provide a key to sign.";
     }
+
+    // if (signKeyObject.key.includes("ENCRYPTED") && signKeyObject.passphrase == undefined)
+    // {
+    //     throw "It seems like your (presumably private) key is encrypted. Please provide a passphrase.";
+    // }
     
     let signature;              // Buffer
     try                         // If we can, force sha3-512 or the hashAlg. If the algorithm is uncompromising with its hashes (like ED25519), let it cook.
@@ -423,9 +429,10 @@ const secureSign = (hashAlg, data, signKeyObject) => {
  * Verifies a digital signature using a private/public key
  * @param {String|undefined} hashAlg Hashing algorithm. This must be the same as the hashing algorithm used in the digital signature
  * @param {Buffer} data Data to be verify signature of. You are responsible for zeroing this out later down the line if it's sensitive.
- * @param {{key: String, dsaEncoding: String, padding: Number, passphrase: String}} verifyKeyObject JSON object with key and other configs (such as padding. Consider using crypto.constants.RSA_PKCS1_PSS_PADDING)
+ * @param {{key: KeyObject, dsaEncoding: String, padding: Number, passphrase: String}} verifyKeyObject JSON object with key and other configs (such as padding. Consider using crypto.constants.RSA_PKCS1_PSS_PADDING)
  * @param {String} verifyKeyObject.passphrase If your private key is encrypted, provide a passphrase
  * @param {String} verifyKeyObject.key Key for digital signature
+ * @param {String} verifyKeyObject.dsaEncoding DSA encoding type. This defaults to der (the right option)
  * @param {String} signature The digital signature (in hex)
  * @see https://nodejs.org/api/crypto.html#cryptosignalgorithm-data-key-callback
  * @return {Boolean} Whether or not the digital signature is valid
@@ -702,7 +709,7 @@ const validateAsymmCryptosystem = (cryptosystem) => {
  * The standardized format is `[1 for Asymmetric][Signature Size : 4 bytes][Signature cryptosystem][cryptosystem size : 4 bytes][cryptosystem : up to 2^32 bytes][data]`
  * @param {{dsaPadding: Number, encryptPadding: Number, oaepHash: String|undefined}} cryptosystem JSON of asymmetric cryptosystem
  * @param {Buffer} data (Encrypted) data to write to the file
- * @param {{key: String, dsaEncoding: String, padding: Number, passphrase: String}} dsaKey JSON object with key and password used to generate a digital signature. Encoding is forcibly set to `der` and padding is set to `RSA_PKCS1_PSS_PADDING`.
+ * @param {{key: KeyObject, dsaEncoding: String, padding: Number, passphrase: String}} dsaKey JSON object with key and password used to generate a digital signature. Encoding is forcibly set to `der` and padding is set to `RSA_PKCS1_PSS_PADDING`.
  * @param {String} source The platform that encrypted the data. Either `CLI`, `Server`, or `Web`. Used for compatiability purposes
  * @throws Error cryptosystem is improperly formatted
  * @throws Error if source is not `CLI`, `Server`, or `Web`
@@ -766,7 +773,7 @@ const toFileSyntaxAsymm = (cryptosystem, data, dsaKey, source) => {
 /**
  * Converts a file syntax for asymmetric encryption to a JSON cryptosystem.
  * Also validates the Digital Signatures to check if the file syntax (ie. padding, oaep hash, etc.) stored in the file was tampered with
- * @param {{key: String, dsaEncoding: String, padding: Number, passphrase: String}} dsaKey JSON object with key and password used to decrypt the digital signature. Padding is set to `RSA_PKCS1_PSS_PADDING` and DSA encoding is set to `der`.
+ * @param {{key: KeyObject, dsaEncoding: String, padding: Number, passphrase: String}} dsaKey JSON object with key and password used to decrypt the digital signature. Padding is set to `RSA_PKCS1_PSS_PADDING` and DSA encoding is set to `der`.
  * @param {Buffer} fileBuffer The file buffer, in file syntax
  * @throws Error if the file syntax is for symmetric encryption.
  * @throws Error if the digital signatures do not match
@@ -1209,8 +1216,8 @@ const binToObject = (buffer) => JSON.parse(buffer.toString('utf-8'));
 
 // let symmDec = symmetricDecrypt("49ers", "San Francisco", restored.data, encAlg, restored.cryptoSystem);
 // let unFileConstruct = fromFileConstruct(symmDec.toString('utf-8'));
-// console.dir(unFileConstruct.fileName)
-// console.dir(unFileConstruct.fileContent.toString('utf-8'));
+// console.log(unFileConstruct.fileName)
+// console.log(unFileConstruct.fileContent.toString('utf-8'));
 
 // 🛠️ DEMO for asymm.
 // let keyPair = genKeyPair('rsa', {

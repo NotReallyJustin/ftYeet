@@ -141,7 +141,7 @@ function uploadSymm(filePath, password, encAlg, authCode, expireTime, burnOnRead
     if (!fileUtil.canRead(filePath))
     {
         throw `Error when uploading file: Cannot read contents of ${filePath}.`;
-    }
+    } 
 
     if (!cryptoUtil.supportedCiphers.includes(encAlg))
     {

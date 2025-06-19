@@ -311,7 +311,6 @@ GET: https://api.ftyeet.something/download
 * Private key rotation daemon on server
 * 🚨 Lowkey thinking of just flat out not giving users permission to upload a file without a password because c'mon dude at that point why even bother 
 * 2FA? Lowkey this is probably overkill
-* Node.js stand alone executables
 * Buy ftyeet domain. As of now, this DNS is getting resolved locally which is not rly a good thing lmao
 * Maybe symmetric enc's cryptosystem should tell us the encryption alg
 * Instead of buffer.from(), consider V8 serialization

@@ -23,6 +23,8 @@ services:
       CONNECTIONTIMEOUT: 5000
       # FWGROUPID: 1010   # Make sure this matches with build args
       # FWGROUPNAME: filewrite    # Make sure this matches with build args
+      HSMHOST: crypto
+      HSMPORT: 6312     # Make sure this matches the expose down below
     secrets:
       - cert
       - server_privkey
