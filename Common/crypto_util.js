@@ -423,7 +423,9 @@ const secureSign = (hashAlg, data, signKeyObject) => {
  * Verifies a digital signature using a private/public key
  * @param {String|undefined} hashAlg Hashing algorithm. This must be the same as the hashing algorithm used in the digital signature
  * @param {Buffer} data Data to be verify signature of. You are responsible for zeroing this out later down the line if it's sensitive.
- * @param {KeyObject} verifyKeyObject JSON KeyObject used to verify $signature. This is what you get when you run `genPubKeyObject()` on the public key.
+ * @param {{key: String, dsaEncoding: String, padding: Number, passphrase: String}} verifyKeyObject JSON object with key and other configs (such as padding. Consider using crypto.constants.RSA_PKCS1_PSS_PADDING)
+ * @param {String} verifyKeyObject.passphrase If your private key is encrypted, provide a passphrase
+ * @param {String} verifyKeyObject.key Key for digital signature
  * @param {String} signature The digital signature (in hex)
  * @see https://nodejs.org/api/crypto.html#cryptosignalgorithm-data-key-callback
  * @return {Boolean} Whether or not the digital signature is valid
@@ -434,11 +436,16 @@ const secureVerify = (hashAlg, data, verifyKeyObject, signature) => {
     {
         throw "HashAlg is not supported by Node.js. Check to make sure you are using the same one as the hashing algorithm.";
     }
-
-    if (!isKeyObject(verifyKeyObject))
+    
+    if (verifyKeyObject.key == undefined)
     {
-        throw "verifyKeyObject must be an instance of KeyObject. Remember to run it through `genPubKeyObject()`.";
+        throw "Please provide a key to sign.";
     }
+
+    // if (verifyKeyObject.key.includes("ENCRYPTED") && verifyKeyObject.passphrase == undefined)
+    // {
+    //     throw "It seems like your key is encrypted. Please provide a passphrase.";
+    // }
 
     let signatureBuffer = Buffer.from(signature, 'hex');        // Buffer
 
@@ -695,7 +702,7 @@ const validateAsymmCryptosystem = (cryptosystem) => {
  * The standardized format is `[1 for Asymmetric][Signature Size : 4 bytes][Signature cryptosystem][cryptosystem size : 4 bytes][cryptosystem : up to 2^32 bytes][data]`
  * @param {{dsaPadding: Number, encryptPadding: Number, oaepHash: String|undefined}} cryptosystem JSON of asymmetric cryptosystem
  * @param {Buffer} data (Encrypted) data to write to the file
- * @param {KeyObject} dsaKey JSON KeyObject used to generate a digital signature.
+ * @param {{key: String, dsaEncoding: String, padding: Number, passphrase: String}} dsaKey JSON object with key and password used to generate a digital signature. Encoding is forcibly set to `der` and padding is set to `RSA_PKCS1_PSS_PADDING`.
  * @param {String} source The platform that encrypted the data. Either `CLI`, `Server`, or `Web`. Used for compatiability purposes
  * @throws Error cryptosystem is improperly formatted
  * @throws Error if source is not `CLI`, `Server`, or `Web`
@@ -711,11 +718,6 @@ const toFileSyntaxAsymm = (cryptosystem, data, dsaKey, source) => {
     if (!["CLI", "Server", "Web"].includes(source))
     {
         throw "Failed to convert to file syntax: Source parameter must contain `CLI`, `Server`, or `Web`."
-    }
-
-    if (!isKeyObject(dsaKey))
-    {
-        throw "Failed to convert to file syntax: `dsaKey` must be a KeyObject. Remember to run it through `genPrivKeyObject()`.";
     }
 
     cryptosystem.source = source;
@@ -740,6 +742,9 @@ const toFileSyntaxAsymm = (cryptosystem, data, dsaKey, source) => {
     zeroBuffer(crytoSizeBuffer);
     zeroBuffer(cryptosysBuffer);
 
+    // Forcibly change to RSA_PKCS1_PSS_PADDING padding and der encoding just in case the user tries to pass them in
+    dsaKey.padding = constants.RSA_PKCS1_PSS_PADDING;
+    dsaKey.dsaEncoding = 'der';
     let cryptoSigBuffer = Buffer.from(secureSign('sha3-512', accCryptosysBuffer, dsaKey), 'hex');
 
     // Take care of [1 for Asymmetric][Signature Size : 4 bytes]
@@ -761,7 +766,7 @@ const toFileSyntaxAsymm = (cryptosystem, data, dsaKey, source) => {
 /**
  * Converts a file syntax for asymmetric encryption to a JSON cryptosystem.
  * Also validates the Digital Signatures to check if the file syntax (ie. padding, oaep hash, etc.) stored in the file was tampered with
- * @param {KeyObject} dsaKey JSON KeyObject used to generate (and now verify) a digital signature.
+ * @param {{key: String, dsaEncoding: String, padding: Number, passphrase: String}} dsaKey JSON object with key and password used to decrypt the digital signature. Padding is set to `RSA_PKCS1_PSS_PADDING` and DSA encoding is set to `der`.
  * @param {Buffer} fileBuffer The file buffer, in file syntax
  * @throws Error if the file syntax is for symmetric encryption.
  * @throws Error if the digital signatures do not match
@@ -769,12 +774,6 @@ const toFileSyntaxAsymm = (cryptosystem, data, dsaKey, source) => {
  * @returns {{cryptoSystem: JSON, data: Buffer}} The cryptosystem and data in a JSON object
  */
 const fromFileSyntaxAsymm = (dsaKey, fileBuffer) => {
-    
-    // Check DSA key
-    if (!isKeyObject(dsaKey))
-    {
-        throw "Error parsing asymmetric file syntax: `dsaKey` must be a KeyObject. Remember to run it through `genPubKeyObject()`.";
-    }
 
     // Current buffer offset, in bytes
     let currOffset = 0;
@@ -804,6 +803,8 @@ const fromFileSyntaxAsymm = (dsaKey, fileBuffer) => {
 
     // Check the signature
     let accCryptosystem = fileBuffer.subarray(sigOffset, sigOffset + 4 + cryptosystemSize);
+    dsaKey.dsaEncoding = 'der';
+    dsaKey.padding = constants.RSA_PKCS1_PSS_PADDING;   // Forcibly change dsakey options cos user is dumb
     let isSignatureValid = secureVerify('sha3-512', accCryptosystem, dsaKey, signature);
 
     if (!isSignatureValid)
@@ -915,7 +916,6 @@ const genPubKeyObject = (pubKey, encoding) => {
                     key: inBase64 ? base64ToPubKey(pubKey, 'der') : (inBinary ? binToKey(pubKey, 'der') : pubKey),
                     encoding: 'utf-8', 
                     format: 'der',
-                    dsaEncoding: 'der', // Forcibly set the DSA encoding to DER when verifying
                     type: 'spki'
                 });
             }
@@ -925,7 +925,6 @@ const genPubKeyObject = (pubKey, encoding) => {
                     key: inBase64 ? base64ToPubKey(pubKey, 'der') : (inBinary ? binToKey(pubKey, 'der') : pubKey),
                     encoding: 'utf-8',
                     format: 'der',
-                    dsaEncoding: 'der', // Forcibly set the DSA encoding to DER when verifying
                     type: 'pkcs1'
                 });
             }
@@ -934,7 +933,6 @@ const genPubKeyObject = (pubKey, encoding) => {
                 return createPublicKey({
                     key: inBase64 ? base64ToPubKey(pubKey, format) : (inBinary ? binToKey(pubKey, format) : pubKey),
                     encoding: 'utf-8',  // Doesn't do anything, but `encoding` just tells them that if they see a string, parse it as utf-8. 
-                    padding: crypto.constants.RSA_PKCS1_PSS_PADDING, // In case this is RSA and we're igning later
                     format: format      // If it's not a string, this gets ignored.
                 });
             }
@@ -971,7 +969,6 @@ const genPrivKeyObject = (privateKey, password, inBinary) => {
                     encoding: 'utf-8',          // Kinda useless ngl; only used by Node.js when the key is a string
                     format: 'der',
                     type: 'pkcs8',
-                    dsaEncoding: 'der', // Forcibly set the DSA encoding to DER when signing
                     passphrase: password
                 });
             }
@@ -982,7 +979,6 @@ const genPrivKeyObject = (privateKey, password, inBinary) => {
                     encoding: 'utf-8',
                     format: 'der',
                     type: 'pkcs1',
-                    dsaEncoding: 'der', // Forcibly set the DSA encoding to DER when signing
                     passphrase: password
                 });
             }
@@ -992,8 +988,7 @@ const genPrivKeyObject = (privateKey, password, inBinary) => {
                     key: inBinary ? binToKey(privateKey, format) : privateKey,
                     encoding: 'utf-8',
                     format: format,     // PEM or jwk
-                    passphrase: password,
-                    padding: constants.RSA_PKCS1_PSS_PADDING, // In case this is RSA
+                    passphrase: password
                 });
             }
         }
@@ -1242,14 +1237,13 @@ const binToObject = (buffer) => JSON.parse(buffer.toString('utf-8'));
 // let fileConstruct = toFileConstruct("JoshAllen.md", Buffer.from("Touchdown San Francisco!", 'utf-8'));
 // let encrypted = publicEncrypt({key: pubKey, oaepHash: 'sha3-512', padding: constants.RSA_PKCS1_OAEP_PADDING}, Buffer.from(fileConstruct, 'utf-8'));
 
-// let signature = secureSign('sha3-512', encrypted, privKey);
+// let signature = secureSign('sha3-512', encrypted, {key: privKey, passphrase: 'CMC', padding: constants.RSA_PKCS1_PSS_PADDING});
 // // console.log(signature.length)
-// // let isValid = secureVerify('sha3-512', Buffer.from("hello", "ascii"), pubKey, signature);
-// // console.log(isValid);
+// // let isValid = secureVerify('sha3-512', Buffer.from("hello", "ascii"), {key: keyPair.publicKey, padding: constants.RSA_PKCS1_PSS_PADDING}, signature);
 
 // let cryptosystem = genAsymmCryptosystem(signature, constants.RSA_PKCS1_PSS_PADDING, constants.RSA_PKCS1_OAEP_PADDING, 'sha3-512');
-// let fileSyntax = toFileSyntaxAsymm(cryptosystem, encrypted, privKey, 'CLI');
-// let restored = fromFileSyntaxAsymm(pubKey, fileSyntax);
+// let fileSyntax = toFileSyntaxAsymm(cryptosystem, encrypted, {key: privKey, passphrase: 'CMC'}, 'CLI');
+// let restored = fromFileSyntaxAsymm({key:pubKey}, fileSyntax);
 
 // let decrypted = privateDecrypt({key: privKey, oaepHash: restored.cryptoSystem.oaepHash, padding: restored.cryptoSystem.encryptPadding}, restored.data);
 // let unFileConstruct = fromFileConstruct(decrypted.toString('utf-8'));
