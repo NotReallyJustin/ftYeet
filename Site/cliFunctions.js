@@ -3,18 +3,25 @@ import { writeFile, chmod, readFileSync } from 'fs';
 import * as cryptoUtil from '../Common/crypto_util.js';
 import * as path from 'path';
 import * as fileUtil from '../Common/file_util.js';
+
 import { getFile, logSymmFile, runQuery } from './psql.js';
 import { randomBytes } from 'crypto';
 import { asymmEnc, verify, symmDec, symmEnc } from '../Crypto/cryptoFunc.js';
+import { hsmEncrypt, hsmDecrypt } from './hsm.js';
 
 export { genURL, uploadSymm, checkURL, downloadSymm }
 
 // ⭐ Formatting note: I use () => {} if there's no side effects. function() {} is used when there is a side effect
 
 /**
- * URL of the crypto server (HSM)
+ * Temporary key used to HMAC the cryptosystem
  */
-const TEMP_PWD = "Temporary";
+const HMAC_CRYPTOSYS_KEY = "Temporary";
+// const TEMP_PWD = "Temporary";
+
+/**
+ * Path to store the files in
+ */
 const FILE_DIR = "./files/";
 
 /**
@@ -90,12 +97,11 @@ const checkURL = async (url) => {
 function uploadSymm(data, expireTime, burnOnRead, pwdHash, url)
 {
     // Encrypt the data again (by converting it to - you guessed it - another file syntax!). In the future, this is gonna get moved
-    // TODO: Adapt this to HSM.js
-    let symmEnc = cryptoUtil.symmetricEncrypt(TEMP_PWD, TEMP_PWD, data, 'chacha20-poly1305', 12);
+    let symmEnc = hsmEncrypt(data);
     let ciphertext = symmEnc.ciphertext;
     delete symmEnc.ciphertext;
 
-    let encryptedData = cryptoUtil.toFileSyntaxSymm(symmEnc, ciphertext, cryptoUtil.secureKeyGen(TEMP_PWD, 32, symmEnc.hmacSalt), 'Server');
+    let encryptedData = cryptoUtil.toFileSyntaxSymm(symmEnc, ciphertext, cryptoUtil.secureKeyGen(HMAC_CRYPTOSYS_KEY, 32, symmEnc.hmacSalt), 'Server');
 
     return new Promise((resolve, reject) => {
         secureWrite(encryptedData)
@@ -180,7 +186,7 @@ function downloadSymm(url, pwdHash)
 
                 try
                 {
-                    restored = cryptoUtil.fromFileSyntaxSymm(undefined, TEMP_PWD, fileSyntax);
+                    restored = cryptoUtil.fromFileSyntaxSymm(undefined, HMAC_CRYPTOSYS_KEY, fileSyntax);
                 }
                 catch(err)
                 {
@@ -193,8 +199,8 @@ function downloadSymm(url, pwdHash)
 
                 try
                 {
-                    // TODO: Readapt this to HSM.js
-                    decrypted = cryptoUtil.symmetricDecrypt(TEMP_PWD, TEMP_PWD, restored.data, 'chacha20-poly1305', restored.cryptoSystem);
+                    decrypted = hsmDecrypt(restored.cryptoSystem);
+                    // decrypted = cryptoUtil.symmetricDecrypt(TEMP_PWD, TEMP_PWD, restored.data, 'chacha20-poly1305', restored.cryptoSystem);
                 }
                 catch(err)
                 {

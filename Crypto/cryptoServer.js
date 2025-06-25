@@ -8,8 +8,8 @@ import express from 'express';
 import { createServer } from 'https';
 import { readFileSync } from 'fs';
 
-import { symmEnc, symmDec, sign, asymmDec } from './cryptoFunc';
-import { zeroBuffer, genPrivKeyObject, genPubKeyObject } from '../Common/crypto_util';
+import { symmEnc, symmDec, sign, asymmDec } from './cryptoFunc.js';
+import { zeroBuffer, genPrivKeyObject, genPubKeyObject } from '../Common/crypto_util.js';
 import { KeyObject } from 'crypto';
 
 const ipc = express();
@@ -131,7 +131,7 @@ ipc.get("/symmEnc", (request, response) => {
         let encrypted = symmEnc(request.body, symmEncPwd, symmHmacPwd);
 
         response.setHeader('Content-Type', 'application/octet-stream');
-        response.send(encrypted);
+        response.send(encrypted);       // Cryptosystem is returned
 
         // Zero out the encrypted data since the "client" has a copy now
         zeroBuffer(encrypted);
@@ -199,12 +199,12 @@ ipc.get("/asymmDec", (request, response) => {
 });
 
 // ---------------- Router Dead End ------------------------------------
-apiRouter.all("*", (request, response) => {
+ipc.all("*", (request, response) => {
     response.status(404).send("Not found.");
 });
 
 // Listen only for HTTPS.
 // Since this thing is not going to be public facing, we don't need to support redirection
-httpsServer.listen(PORT, () => {
-    console.log(`✅ Server launched on port ${PORT}.`);
+httpsServer.listen(process.env.PORT, () => {
+    console.log(`✅ Crypto Server launched on port ${process.env.PORT}.`);
 });

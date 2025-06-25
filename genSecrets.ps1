@@ -11,9 +11,6 @@ param (
     [string]$DBPwd,
 
     [Parameter(Mandatory = $true)]
-    [string]$DBPrivKeyPwd,
-
-    [Parameter(Mandatory = $true)]
     [string]$CryptoCertKeyPwd,
 
     [Parameter(Mandatory = $true)]
@@ -69,7 +66,7 @@ $PrivKeyPwd | Out-File -FilePath Secrets/privKeyPwd.txt -NoNewline     # Roundab
 
 $DBPwd | Out-File -FilePath Secrets/dbPassword.txt -NoNewline
 
-openssl req -x509 -subj "/C=US/ST=NY/L=NYC/O=ftYeet Inc/CN=ftYeet/" -passout "pass:${DBPrivKeyPwd}" -sha256 -days 365 -newkey rsa:2048 -keyout Secrets/dbPrivKey.pem -out Secrets/dbCert.pem 
+openssl req -x509 -subj "/C=US/ST=NY/L=NYC/O=ftYeet Inc/CN=ftYeet/" -nodes -sha256 -days 365 -newkey rsa:2048 -keyout Secrets/dbPrivKey.pem -out Secrets/dbCert.pem 
 $DBPrivKeyPwd | Out-File -FilePath Secrets/dbPrivKeyPwd.txt -NoNewline
 
 openssl req -x509 -subj "/C=US/ST=NY/L=NYC/O=ftYeet Inc/CN=ftYeet/" -passout "pass:${CryptoCertKeyPwd}" -sha256 -days 365 -newkey rsa:2048 -keyout Secrets/cryptoHTTPKey.pem -out Secrets/cryptoCert.pem 

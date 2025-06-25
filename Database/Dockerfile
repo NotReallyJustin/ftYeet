@@ -3,8 +3,8 @@
 # ⭐ Copy files - multistaging it to restrict what final image can see
 FROM alpine AS build-copy
 WORKDIR /var/lib/postgresql/
-COPY Secrets/dbPrivKey.pem /var/lib/postgresql/dbPrivKey.pem
-COPY Secrets/dbCert.pem /var/lib/postgresql/dbCert.pem
+COPY Secrets/dbPrivKey.pem /var/lib/postgresql/
+COPY Secrets/dbCert.pem /var/lib/postgresql/
 
 COPY Database/createTable.sql /docker-entrypoint-initdb.d/createTable.sql
 

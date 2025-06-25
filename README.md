@@ -42,12 +42,15 @@ Alternatively, if you don't want to manually create all this, run `genSecrets.ps
 
 ```ps1
 # Add -ExecutionPolicy Bypass if needed
-powershell.exe .\genSecrets.ps1 -PrivKeyPwd "CMC" -DBPwd "TralaleroTralala" -DBPrivKeyPwd "JsxDrt" -CryptoCertKeyPwd "Scion" -CryptoEncKeyPwd "CharlesChadwick" -CryptoSignKeyPwd "DanteCastello" -CryptoSymmPwd "If_Any_Of_My-DND_Fellas_Are_Lurking_Here_and-Recognize_these_names_Hi!" -CryptoHMACPwd "WeBringTheBoom"
+powershell.exe .\genSecrets.ps1 -PrivKeyPwd "CMC" -DBPwd "TralaleroTralala" -CryptoCertKeyPwd "Scion" -CryptoEncKeyPwd "CharlesChadwick" -CryptoSignKeyPwd "DanteCastello" -CryptoSymmPwd "If_Any_Of_My-DND_Fellas_Are_Lurking_Here_and-Recognize_these_names_Hi!" -CryptoHMACPwd "WeBringTheBoom"
 ```
 
 If you're using Linux or WSL, you can run this instead:
 ```bash
 bash ./genSecrets.sh PrivKeyPwd DBPwd DBPrivKeyPwd CryptoCertKeyPwd CryptoEncKeyPwd CryptoSignKeyPwd CryptoSymmPwd CryptoHMACPasswd
+
+# For example:
+bash ./genSecrets.sh CMC TralaleroTralala Scion CharlesChadwick DanteCastello If_Any_Of_My-DND_Fellas_Are_Lurking_Here_and-Recognize_these_names_Hi! WeBringTheBoom
 ```
 
 If you don't have OpenSSL, install it here: https://www.openssl.org/

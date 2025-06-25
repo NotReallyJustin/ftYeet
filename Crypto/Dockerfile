@@ -23,8 +23,8 @@ RUN --mount=type=bind,source=Site/package.json,target=package.json \
 FROM node:${NODE_VERSION}-alpine
 WORKDIR /usr/src/app/Crypto
 
-COPY --from=build-site /usr/src/app/Crypto/ /usr/src/app/Crypto/
-COPY --from=build-common /usr/src/app/Crypto/ /usr/src/app/Crypto/
+COPY --from=build-crypto /usr/src/app/Crypto/ /usr/src/app/Crypto/
+COPY --from=build-common /usr/src/app/Common/ /usr/src/app/Common/
 
 # Run the application as a non-root user.
 USER node

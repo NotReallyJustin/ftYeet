@@ -1,0 +1,18 @@
+{
+  "name": "ftyeet-crypto",
+  "version": "1.0.0",
+  "description": "Crypto \"HSM\" for ftyeet",
+  "main": "cryptoServer.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node cryptoServer.js"
+  },
+  "keywords": [
+    "Crypto"
+  ],
+  "author": "blud",
+  "license": "GPL-3.0-or-later",
+  "dependencies": {
+    "express": "^5.1.0"
+  }
+}

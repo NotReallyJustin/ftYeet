@@ -12,13 +12,12 @@ COPY Common/ /usr/src/app/Common/
 # Copy one file in Crypto
 FROM node:${NODE_VERSION}-alpine AS build-Crypto
 WORKDIR /usr/src/Crypto
-COPY Crypto/cryptoFunc.js /usr/src/Crypto/cryptoFunc.js
+COPY Crypto/cryptoFunc.js /usr/src/Crypto/
 
 # Copy Site
-FROM node:${NODE_VERSION}-alpine AS build-site
+FROM node:${NODE_VERSION}-alpine AS build-sitemain
 WORKDIR /usr/src/app
 COPY Site/ /usr/src/app/Site/
-COPY Site/Keys/ /usr/src/app/Site/Keys/
 WORKDIR /usr/src/app/Site
 
 RUN --mount=type=bind,source=Site/package.json,target=package.json \
@@ -30,9 +29,9 @@ RUN --mount=type=bind,source=Site/package.json,target=package.json \
 FROM node:${NODE_VERSION}-alpine
 WORKDIR /usr/src/app/Site
 
-COPY --from=build-site /usr/src/app/Site/ /usr/src/app/Site/
 COPY --from=build-common /usr/src/app/Common/ /usr/src/app/Common/
-COPY --from=build-Crypto /usr/src/Crypto/ /usr/src/app/Site/Crypto/
+COPY --from=build-Crypto /usr/src/Crypto/ /usr/src/app/Crypto/
+COPY --from=build-sitemain /usr/src/app/Site/ /usr/src/app/Site/
 
 # Make a directory that node can write to
 RUN mkdir /usr/src/app/Site/files

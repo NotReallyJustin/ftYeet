@@ -4,6 +4,7 @@
 */
 
 import fetch from 'node-fetch';
+import { binToObject, objectToBin } from '../Common/crypto_util.js';
 export { hsmDecrypt, hsmEncrypt }
 
 /**
@@ -47,14 +48,16 @@ async function callHSM(urlPath, body)
  * Asks the HSM to encrypt a plaintext.
  * @param {Buffer} plaintext The thing to encrypt. Hopefully, this is already encrypted clientside because E2EE. This must be an octet stream.
  * @throws If we failed to encrypt
- * @returns {Buffer} The ciphertext
+ * @returns {{ciphertext: Buffer, encIV: String, encSalt: String, encAuthTag: String, hmac: String, hmacSalt: String}} The encrypted cryptosystem
  */
 async function hsmEncrypt(plaintext)
 {
     try
     {
-        const ciphertext = await callHSM("/symmEnc", plaintext);
-        return ciphertext;
+        let binaryResp = await callHSM("/symmEnc", plaintext);
+
+        const cryptosystem = binToObject(binaryResp);
+        return cryptosystem;
     }
     catch(err)
     {
@@ -64,15 +67,17 @@ async function hsmEncrypt(plaintext)
 
 /**
  * Asks the HSM to decrypt a ciphertext.
- * @param {Buffer} ciphertext The thing to decrypt.
+ * @param {{ciphertext: Buffer, encIV: String, encSalt: String, encAuthTag: String, hmac: String, hmacSalt: String}} Cryptosystem The encrypted cryptosystem
  * @throws If we failed to decrypt
  * @returns {Buffer} The plaintext. Hopefully this is still encrypted due to E2EE. If this is sensitive, you are responsible for zeroing this out. 
  */
-async function hsmDecrypt(ciphertext)
+async function hsmDecrypt(cryptosystem)
 {
     try
     {
-        const plaintext = await callHSM("/symmDec", ciphertext);
+        let cryptosystemBin = objectToBin(cryptosystem)
+        const plaintext = await callHSM("/symmDec", cryptosystemBin);
+        
         return plaintext;
     }
     catch(err)

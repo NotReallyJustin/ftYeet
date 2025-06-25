@@ -7,12 +7,11 @@
 # I know bash wants these in uppercase but I'm making things portable so we're just gonna ignore the convention stuff
 PrivKeyPwd=$1;
 DBPwd=$2;
-DBPrivKeyPwd=$3;
-CryptoCertKeyPwd=$4;
-CryptoEncKeyPwd=$5;
-CryptoSignKeyPwd=$6;
-CryptoSymmPwd=$7;
-CryptoHMACPwd=$8;
+CryptoCertKeyPwd=$3;
+CryptoEncKeyPwd=$4;
+CryptoSignKeyPwd=$5;
+CryptoSymmPwd=$6;
+CryptoHMACPwd=$7;
 
 function abort() {
     echo $1 >&2;
@@ -45,7 +44,9 @@ echo -n $PrivKeyPwd > ./Secrets/privKeyPwd.txt;
 
 echo -n $DBPwd > ./Secrets/dbPassword.txt;
 
-openssl req -x509 -subj "/C=US/ST=NY/L=NYC/O=ftYeet Inc/CN=ftYeet/" -passout "pass:${DBPrivKeyPwd}" -sha256 -days 365 -newkey rsa:2048 -keyout Secrets/dbPrivKey.pem -out Secrets/dbCert.pem;
+# Private key will stay private; plus this is only for SSL connections to the database
+# postgres cannot decrypt private keys
+openssl req -x509 -subj "/C=US/ST=NY/L=NYC/O=ftYeet Inc/CN=ftYeet/" -nodes -sha256 -days 365 -newkey rsa:2048 -keyout Secrets/dbPrivKey.pem -out Secrets/dbCert.pem;
 echo -n $DBPrivKeyPwd > ./Secrets/dbPrivKeyPwd.txt;
 
 openssl req -x509 -subj "/C=US/ST=NY/L=NYC/O=ftYeet Inc/CN=ftYeet/" -passout "pass:${CryptoCertKeyPwd}" -sha256 -days 365 -newkey rsa:2048 -keyout Secrets/cryptoHTTPKey.pem -out Secrets/cryptoCert.pem;
@@ -58,7 +59,7 @@ openssl rsa -in ./Secrets/cryptoPrivKey.pem -passin "pass:${CryptoEncKeyPwd}" -o
 echo -n $CryptoEncKeyPwd > ./Secrets/cryptoEncKeyPwd.txt;
 
 openssl genpkey -algorithm ed25519 -aes-256-cbc -pass "pass:${CryptoSignKeyPwd}" -out ./Secrets/cryptoPrivKeySign.pem;
-openssl pkey -in ./Secrets/cryptoPrivKeySign.pem -passin "pass:${CryptoSignKeyPwd}" -outform PEM -pubout -out ./Secrets/cryptoPubKey.pem;
+openssl pkey -in ./Secrets/cryptoPrivKeySign.pem -passin "pass:${CryptoSignKeyPwd}" -outform PEM -pubout -out ./Secrets/cryptoPubKeySign.pem;
 echo -n $CryptoSignKeyPwd > ./Secrets/cryptoSignKeyPwd.txt;
 
 echo -n $CryptoSymmPwd > Secrets/cryptoSymmPwd.txt;
