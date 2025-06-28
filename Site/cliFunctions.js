@@ -92,44 +92,48 @@ const checkURL = async (url) => {
  * @param {String} pwdHash Hash of the password used to encrypt the file (in hex). This is going to be hashed again.
  * @param {String} url The URL you can access the file from
  * @throws Promise rejects if anything goes wrong with the symmetric file upload process. If this happens, return a 400 error.
- * @returns {Proimse<>} .then() when it's successful
+ * @returns {Promise<>} .then() when it's successful
  */
 function uploadSymm(data, expireTime, burnOnRead, pwdHash, url)
 {
-    // Encrypt the data again (by converting it to - you guessed it - another file syntax!). In the future, this is gonna get moved
-    let symmEnc = hsmEncrypt(data);
-    let ciphertext = symmEnc.ciphertext;
-    delete symmEnc.ciphertext;
-
-    let encryptedData = cryptoUtil.toFileSyntaxSymm(symmEnc, ciphertext, cryptoUtil.secureKeyGen(HMAC_CRYPTOSYS_KEY, 32, symmEnc.hmacSalt), 'Server');
-
     return new Promise((resolve, reject) => {
-        secureWrite(encryptedData)
-            .then((pathObjects) => {
-                // Hash pwds again and then store it
-                let pwdHash2 = cryptoUtil.genPwdHash(pwdHash, 32);
+        
+        // Encrypt the data again (by converting it to - you guessed it - another file syntax!). In the future, this is gonna get moved
+        hsmEncrypt(data).then(symmEnc => {
+            let ciphertext = symmEnc.ciphertext;
+            delete symmEnc.ciphertext;
+            
+            let encryptedData = cryptoUtil.toFileSyntaxSymm(symmEnc, ciphertext, cryptoUtil.secureKeyGen(HMAC_CRYPTOSYS_KEY, 32, symmEnc.hmacSalt), 'Server');
 
-                // Write to database
-                let expireTimestamp = new Date(Date.now() + expireTime * 1000);
+            secureWrite(encryptedData)
+                .then((pathObjects) => {
+                    // Hash pwds again and then store it
+                    let pwdHash2 = cryptoUtil.genPwdHash(pwdHash, 32);
 
-                logSymmFile(
-                    pathObjects.fileName, pwdHash2, burnOnRead, expireTimestamp, url
-                ).then(() => {
+                    // Write to database
+                    let expireTimestamp = new Date(Date.now() + expireTime * 1000);
 
-                    // Auto delete process start       
+                    logSymmFile(
+                        pathObjects.fileName, pwdHash2, burnOnRead, expireTimestamp, url
+                    ).then(() => {
 
-                    console.log(`Data written to ${pathObjects.newFilePath}`);
-                    resolve();
+                        // Auto delete process start       
 
-                }).catch((err) => {
-                    console.error(`Error in uploadSymm when running SQL: ${err}`);
-                    reject("Internal Database Error. Ask the owner of ftYeet to check their logs.");
+                        console.log(`Data written to ${pathObjects.newFilePath}`);
+                        resolve();
+
+                    }).catch((err) => {
+                        console.error(`Error in uploadSymm when running SQL: ${err}`);
+                        reject("Internal Database Error. Ask the owner of ftYeet to check their logs.");
+                    });
+                }).catch(err => {
+                    console.error(`Error in uploadSymm: ${err}`);
+                    reject(err);
                 });
-
-            }).catch(err => {
-                console.error(`Error in uploadSymm: ${err}`);
-                reject(err);
-            });
+        }).catch(err => {
+            console.error(`Error in uploadSymm when making HSM request: ${err}`);
+            reject(err);
+        });
     });
 }
 
@@ -183,10 +187,17 @@ function downloadSymm(url, pwdHash)
 
                 // You usually can't work with file syntax. This resolves it.
                 let restored;
+                let restored_hsm_fmt;
 
                 try
                 {
                     restored = cryptoUtil.fromFileSyntaxSymm(undefined, HMAC_CRYPTOSYS_KEY, fileSyntax);
+
+                    // Things are formatted *slightly* differently in the HSM, so pay attention since we're
+                    // coming from file syntax. In file syntax, the ciphertext == data, and the cryptosystem is seperated.
+                    // so...
+                    restored_hsm_fmt = restored.cryptoSystem;
+                    restored_hsm_fmt.ciphertext = restored.data;
                 }
                 catch(err)
                 {
@@ -195,20 +206,14 @@ function downloadSymm(url, pwdHash)
                 }
 
                 // This will still be in file syntax. We ran it twice.
-                let decrypted;
+                hsmDecrypt(restored_hsm_fmt)
+                    .then(decrypted => {
+                        resolve(decrypted);
+                    }).catch(err => {
+                        console.error(`Error when decrypting file syntax: ${err}`);
+                        reject(`Unable to retrieve file from ftyeet. ${err}`);
+                    });
 
-                try
-                {
-                    decrypted = hsmDecrypt(restored.cryptoSystem);
-                    // decrypted = cryptoUtil.symmetricDecrypt(TEMP_PWD, TEMP_PWD, restored.data, 'chacha20-poly1305', restored.cryptoSystem);
-                }
-                catch(err)
-                {
-                    console.error(`Error when decrypting file syntax: ${err}`);
-                    reject(`Unable to retrieve file from ftyeet. ${err}`);
-                }
-
-                resolve(decrypted);
             }).catch(err => {
                 console.error(`Error in downloadSymm when running SQL: ${err}`);
                 reject("Internal Database Error. Ask the owner of ftYeet to check their logs.");

@@ -16,6 +16,7 @@ export { runQuery, logSymmFile, getFile }
 const clientPool = new Pool({
     host: process.env.PGHOST,
     user: process.env.PGUSER,
+    database: process.env.PGDATABASE,
     idleTimeoutMillis: process.env.QUERYTIMEOUT,
     connectionTimeoutMillis: process.env.CONNECTIONTIMEOUT,
     port: process.env.PGPORT,

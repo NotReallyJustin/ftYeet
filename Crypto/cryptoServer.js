@@ -113,10 +113,11 @@ const checkContentType = (contentType) => (request, response, next) => {
 }
 
 ipc.use("/upload", checkContentType('application/octet-stream'));
+ipc.use(express.raw({type: 'application/octet-stream', limit: '100mb'}));
 
 // --------------- Start actual HSM Stuff -------------------------------------------------
 
-ipc.get("/", (request, response) => {
+ipc.post("/", (request, response) => {
     response.status(404).send("Try again bozo. Use either /symmEnc, /symmDec, /sign, or /asymmEnc.");
 });
 
@@ -124,7 +125,7 @@ ipc.get("/", (request, response) => {
 // do everything asymmetrically - but we'll see.
 
 // request.body should contain a buffer representing the data to encrypt
-ipc.get("/symmEnc", (request, response) => {
+ipc.post("/symmEnc", (request, response) => {
     
     try
     {
@@ -143,7 +144,8 @@ ipc.get("/symmEnc", (request, response) => {
 });
 
 // request.body should contain a buffer representing the encrypted cryptosystem
-ipc.get("/symmDec", (request, response) => {
+// {ciphertext: Buffer, encIV: String, encSalt: String, encAuthTag: String, hmac: String, hmacSalt: String}
+ipc.post("/symmDec", (request, response) => {
 
     try
     {
@@ -163,7 +165,7 @@ ipc.get("/symmDec", (request, response) => {
 });
 
 // request.body should contain a buffer representing the thing to sign
-ipc.get("/sign", (request, response) => {
+ipc.post("/sign", (request, response) => {
 
     try
     {
@@ -180,7 +182,7 @@ ipc.get("/sign", (request, response) => {
 
 // asymmEnc is not implemented here, since the external servers will have access to the public key.
 // Since they have access to the public key, it makes no sense to have the HSM perform the operation and slow down ftYeet via the IPC.
-ipc.get("/asymmDec", (request, response) => {
+ipc.post("/asymmDec", (request, response) => {
     
     try
     {

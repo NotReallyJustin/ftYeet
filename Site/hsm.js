@@ -4,6 +4,7 @@
 */
 
 import fetch from 'node-fetch';
+import { Agent } from 'https';
 import { binToObject, objectToBin } from '../Common/crypto_util.js';
 export { hsmDecrypt, hsmEncrypt }
 
@@ -11,6 +12,14 @@ export { hsmDecrypt, hsmEncrypt }
  * URL of the crypto server (HSM).
  */
 const HSM_URL = `https://${process.env.HSMHOST}:${process.env.HSMPORT}`;
+
+/**
+ * Temporary SSL agent until we get a proper SSL cert for ftYeet.
+ * Bypasses the Self-Signed Cert warnings.
+ */
+const IGNORE_SSL_AGENT = new Agent({
+    rejectUnauthorized: false
+});
 
 /**
  * Makes a GET request to the HSM tunnel. This function is not intended to be called outside of hsm.js since it can get a bit fucky.
@@ -22,26 +31,34 @@ const HSM_URL = `https://${process.env.HSMHOST}:${process.env.HSMPORT}`;
  */
 async function callHSM(urlPath, body)
 {
-    const response = await fetch(`${HSM_URL}${urlPath}`, {
-        method: 'GET',
-        headers: {
-            'Content-Type': 'application/octet-stream',
-            follow: 1,
-            agent: IGNORE_SSL_AGENT
-        },
-        body: body
-    });
+    try
+    {
+        const response = await fetch(`${HSM_URL}${urlPath}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/octet-stream',
+                follow: 1,
+            },
+            agent: IGNORE_SSL_AGENT, // Ignore self-signed certs
+            body: body
+        });
 
-    if (response.ok)
-    {
-        const resp = await response.arrayBuffer();
-        return resp;
+        if (response.ok)
+        {
+            const resp = Buffer.from(await response.arrayBuffer());
+            return resp;
+        }
+        else
+        {
+            const error = await response.text();
+            throw {code: response.status, reason: error};
+        }
     }
-    else
+    catch(err)
     {
-        const error = await response.text();
-        throw {code: response.status, reason: error};
+        throw {code: 500, reason: `Fetch request failed: ${err.reason || err}`};
     }
+    
 }
 
 /**
@@ -57,11 +74,12 @@ async function hsmEncrypt(plaintext)
         let binaryResp = await callHSM("/symmEnc", plaintext);
 
         const cryptosystem = binToObject(binaryResp);
+        cryptosystem.ciphertext = Buffer.from(cryptosystem.ciphertext); // Bug with JSON.parse()
         return cryptosystem;
     }
     catch(err)
     {
-        throw `Error ${err.code} when re-encrypting serverside: ${err.reason}`;
+        throw `Error when re-encrypting serverside: ${err.reason || err}`;
     }
 }
 
@@ -82,6 +100,6 @@ async function hsmDecrypt(cryptosystem)
     }
     catch(err)
     {
-        throw `Error ${err.code} when decrypting once serverside: ${err.reason}`;
+        throw `Error when decrypting once serverside: ${err.reason || err}`;
     }
 }

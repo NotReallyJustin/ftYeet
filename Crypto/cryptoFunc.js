@@ -25,7 +25,7 @@ const symmEnc = (body, encPasswd, hmacPasswd) => {
     }
     catch(err)
     {
-        throw err;
+        throw err.toString();
     }
 
     // Zero out the body
@@ -49,13 +49,14 @@ const symmDec = (cryptosystem, decPasswd, hmacPasswd) => {
     try
     {
         let cryptosystemJSON = cryptoUtil.binToObject(cryptosystem);
+        cryptosystemJSON.ciphertext = Buffer.from(cryptosystemJSON.ciphertext); // JSON parse bug
 
         // We've forced chacha20-poly1305 when encrypting
         symmDec = cryptoUtil.symmetricDecrypt(decPasswd, hmacPasswd, cryptosystemJSON.ciphertext, 'chacha20-poly1305', cryptosystemJSON);
     }
     catch(err)
     {
-        throw err;
+        throw err.toString();
     }
 
     // Zero out the cryptosystem
