@@ -11,4 +11,13 @@ CREATE TABLE files (
     ExpireTime timestamp,
     Url varchar(511),
     CheckSum varchar(511)
-)
+);
+
+CREATE TABLE filesAsymm (
+    Name varchar(511),
+    PubKeyHex varchar(511),
+    BurnOnRead boolean,
+    ExpireTime timestamp,
+    Url varchar(511),
+    CheckSum varchar(511)
+);

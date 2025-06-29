@@ -7,7 +7,31 @@ import pg from 'pg';
 import {readFileSync } from 'fs';
 const { Pool } = pg;
 
+import { hsmSign } from './hsm.js';
+import { verify } from '../Crypto/cryptoFunc.js';
+import { genPubKeyObject, zeroBuffer } from '../Common/crypto_util.js';
+
 export { runQuery, logSymmFile, getFile }
+
+// --------- Crypto files ---------
+
+/**
+ * (Ideally) ED-25519 public key used to verify digital signatures
+ * @type {Buffer}
+ */
+let cryptoPubkeySign = readFileSync("/run/secrets/crypto_pubkey_sign");
+
+/**
+ * ⭐ Key object for the public (hopefully ED-25519) key.
+ * THIS IS DECRYPTED! YOU CAN VERIFY STUFF WITH THIS!!!
+ * @type {KeyObject}
+ */
+let verifyKeyObj = genPubKeyObject(cryptoPubkeySign, "binary");
+
+// "Garbage collect" - well - as much as the mark-and-sweep algorithm will let us
+zeroBuffer(cryptoPubkeySign);
+
+// ---------- Official psql --------------
 
 /**
  * Available pool of clients. Generate a client from these to connect to and execute queries to our PSQL dockerfile
@@ -90,20 +114,29 @@ async function runQuery(queryText, queryValues, arrayRowMode)
  */
 async function logSymmFile(fileName, pwdHash2, burnOnRead, expireTimestamp, url)
 {
-    // TODO: Add filetype symmetric in this thing
+    let hsmMerged = `${fileName} ${pwdHash2} ${burnOnRead} ${expireTimestamp} ${url}`;
+
     if (fileName == undefined || pwdHash2 == undefined || burnOnRead == undefined || expireTimestamp == undefined || url == undefined)
     {
-        console.log(`${fileName} ${pwdHash2} ${burnOnRead} ${expireTimestamp} ${url}`)
-        throw "Error when logging file: There's something in the input that is undefined.";
+        console.log(hsmMerged)
+        throw "Error when logging file in database: There's something in the input that is undefined.";
     }
 
     if (!(expireTimestamp instanceof Date))
     {
-        throw "Error when logging file: `expireTimestamp` is not a date.";
+        throw "Error when logging file in database: `expireTimestamp` is not a date.";
     }
 
     // Generate checksum (read: digital signature) of everything here
-    let checksum = "TODO: Replace this with an actual checksum";
+    let checksum;
+    try
+    {
+        checksum = await hsmSign(hsmMerged);
+    }
+    catch(err)
+    {
+        throw err.message || err;
+    }
 
     // Upload to DB
     try
@@ -154,6 +187,23 @@ async function getFile(url)
     
     // There shouldn't be multiple things in the same URL
     // If there is, just return the first one
+    let toReturn = dbOutput.rows[0];
+
+    // Check the checksum
+    let hsmMerged = `${toReturn.name} ${toReturn.pwdhashhash} ${toReturn.burnonread} ${toReturn.expiretime} ${toReturn.url}`;
+    
+    try
+    {
+        if(!verify(hsmMerged, verifyKeyObj, toReturn.checksum))
+        {
+            throw `Checksum/digital signature verification failed.`;
+        }
+    }
+    catch(err)
+    {
+        throw `Error when getting file: ${err.message || err}.`;
+    }
+
     return dbOutput.rows[0];
 }
 

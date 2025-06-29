@@ -81,7 +81,7 @@ let cryptoPrivPwd = readFileSync("/run/secrets/crypto_enc_key_password", {encodi
  */
 const asymmPrivKeyObj = genPrivKeyObject(cryptoPrivkey, cryptoPrivPwd, true);
 
-zeroBuffer(cryptoPubkey);   // "Garbage collect"
+// "Garbage collect"
 zeroBuffer(cryptoPrivkey);
 
 // --------------- Pre-processing. CryptoServer really only accepts binary --------------
