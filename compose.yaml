@@ -30,8 +30,8 @@ services:
       - server_privkey
       - server_privkey_pwd
       - db_password
-      - crypto_pubkey_sign      
-      - crypto_pubkey         # We might not need this pubkey. If that's the case, remove this in prod later
+      - crypto_pubkey_sign    # Verify a signature  
+      - crypto_pubkey         # Asymmetric encryption
     ports:
       - 443:443
       - 80:80
@@ -63,8 +63,7 @@ services:
     secrets:
       - crypto_sign_key_password  # ✅
       - crypto_enc_key_password # ✅
-      - crypto_cert_key_password  # ✅
-      - crypto_pubkey_sign    # ✅  
+      - crypto_cert_key_password  # ✅ 
       - crypto_privkey_sign # ✅
       - crypto_cert         # ✅
       - crypto_cert_privkey  # ✅

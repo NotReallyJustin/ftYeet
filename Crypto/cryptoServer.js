@@ -39,12 +39,6 @@ const symmHmacPwd = readFileSync("/run/secrets/crypto_hmac_password", {encoding:
 // 🔑 Signature key
 
 /**
- * (Ideally) ED-25519 public key used for digital signatures
- * @type {Buffer}
- */
-let cryptoPubkeySign = readFileSync("/run/secrets/crypto_pubkey_sign");
-
-/**
  * (Ideally) ED-25519 private key used for digital signatures
  * @type {Buffer}
  */
@@ -63,16 +57,10 @@ let cryptoPrivSignPwd = readFileSync("/run/secrets/crypto_sign_key_password", {e
  */
 let signKeyObj = genPrivKeyObject(cryptoPrivkeySign, cryptoPrivSignPwd, true);
 
-zeroBuffer(cryptoPubkeySign);   // "Garbage collect" - well - as much as the mark-and-sweep algorithm will let us
+// "Garbage collect" - well - as much as the mark-and-sweep algorithm will let us
 zeroBuffer(cryptoPrivkeySign);
 
 // 🔑 Asymmetric encryption keys
-
-/**
- * Crypto public key used for asymmetric encryption.
- * @type {Buffer}
- */
-let cryptoPubkey = readFileSync("/run/secrets/crypto_pubkey");
 
 /**
  * Crypto private key used for asymmetric encryption.

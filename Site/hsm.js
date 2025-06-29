@@ -6,7 +6,7 @@
 import fetch from 'node-fetch';
 import { Agent } from 'https';
 import { binToObject, objectToBin } from '../Common/crypto_util.js';
-export { hsmDecrypt, hsmEncrypt }
+export { hsmDecrypt, hsmEncrypt, hsmSign }
 
 /**
  * URL of the crypto server (HSM).
@@ -101,5 +101,26 @@ async function hsmDecrypt(cryptosystem)
     catch(err)
     {
         throw `Error when decrypting once serverside: ${err.reason || err}`;
+    }
+}
+
+/**
+ * Asks the HSM to sign a piece of data.
+ * @param {Buffer} data The data to sign. This should be a buffer.
+ * @throws If we failed to sign
+ * @returns {String} The digital signature (in hex)
+ */
+async function hsmSign(data)
+{
+    try
+    {
+        data = Buffer.isBuffer(data) ? data : Buffer.from(data);
+        const signature = await callHSM("/sign", data);
+
+        return signature.toString();
+    }
+    catch(err)
+    {
+        throw `Error when signing serverside: ${err.reason || err}`;
     }
 }

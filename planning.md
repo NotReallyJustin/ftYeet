@@ -69,7 +69,7 @@ God I love this language <br>
 * In case I forget, sign w/ your private key & encrypt with their public key. ✅
 * The user should have the other person's public key. That also acts as authentication lowkey ✅
 * For passwords: Store person A's public key. Still encrypt with person A's public key ✅
-* For sending/authenticating: Store person B's public key. Challenge them with that. A's stuff can be done clientside
+* For sending/authenticating: Store person B's public key. Challenge them with that. A's stuff can be done clientside ✅
 
 ## Supported Ciphers ✅
 Huge shoutout to `https://soatok.blog/2020/05/13/why-aes-gcm-sucks/` and `https://soatok.blog/2020/07/12/comparison-of-symmetric-encryption-methods/#aes-gcm-vs-chacha20poly1305`
@@ -93,16 +93,16 @@ For hashes, we'll use `sha3-512`. `sha2` is probably secure enough, but I had to
 * Was thinking column level encryption but like the most sensitive thing is already hashed. Yay I guess you get a user's public key 😪 What are you gonna do with it? I don't really know
 * On second thought, maybe we should encrypt everything except expireTime with the public key and then private key decrypt this when needed
 
-## SQL Injection
+## SQL Injection ✅
 * I really love MongoDB because it's much better at stopping SQLI than you know... SQL 🙄
-* But lowkey for this project, it might make more sense to boot up an SQL table
+* But lowkey for this project, it might make more sense to boot up an SQL table ✅
 * If we do that:
     * Sanitize User Input using some library I find
-    * Use parameterized queries (thank god we're using Node.js for this)
-        * A bit weird since none of my SQLI textbooks mention this being a defense (they all just tell you to use prepared statements but like I can't really do that in this case)
-        * According to the internet, it's a silver bullet to SQLI
-        * We'll see if it worksd. Even if it doesn't, hopefully that input is sanitized by that library 🤷‍♂️
-        * Edit: Apparently we're worrying too much abt this because "Sanitize User input with a library" is apparently much better than what 75% of the companies out there do
+    * Use parameterized queries (thank god we're using Node.js for this) ✅
+        * A bit weird since none of my SQLI textbooks mention this being a defense (they all just tell you to use prepared statements but like I can't really do that in this case) ✅
+        * According to the internet, it's a silver bullet to SQLI ✅
+        * We'll see if it worksd. Even if it doesn't, hopefully that input is sanitized by that library 🤷‍♂️ ✅
+        * Edit: Apparently we're worrying too much abt this because "Sanitize User input with a library" is apparently much better than what 75% of the companies out there do  
 
 ## Encrypted files + File Syntax ✅
 * The sent file can be in any format the user desires ✅
@@ -175,7 +175,7 @@ For hashes, we'll use `sha3-512`. `sha2` is probably secure enough, but I had to
 ```
 * This makes way more sense when you realize that we're encrypting the files twice
 
-## FtYeet Protocol --> Stateless + JWT
+## FtYeet Protocol --> Stateless + JWT ✅
 * Since we're making it stateless, we might as well tunnel the whole thing under HTTPS
     * `certbot` and `LetsEncrypt` only works for HTTPS
     * I guess I could buy a SSL cert but those cost $
@@ -183,10 +183,10 @@ For hashes, we'll use `sha3-512`. `sha2` is probably secure enough, but I had to
     * Also this means we only need to worry about 1 application on 1 port which is kind of nice 😃
     * Also because the upload will have a lot of arguments so it's easier to manage 
 * **Uploading public keys** ✅
-    * Turns out HTTP really does not like CRLF characters... but public keys love them!
-    * To bypass this, we're encoding public keys in `base64`
-    * This isn't meant to "encrypt" them or to make them more secure; it's a formatting thing
-    * I mean public keys aren't meant to be kept secret regardless. Also if you're still paranoid, this whole thing is running over TLS so 🤷‍♂️
+    * Turns out HTTP really does not like CRLF characters... but public keys love them! ✅
+    * To bypass this, we're encoding public keys in `base64` ✅
+    * This isn't meant to "encrypt" them or to make them more secure; it's a formatting thing ✅
+    * I mean public keys aren't meant to be kept secret regardless. Also if you're still paranoid, this whole thing is running over TLS so 🤷‍♂️ ✅
 * **Upload Asymm**:
 ```
 POST: https://api.ftyeet.something/uploadAsymm
@@ -200,7 +200,7 @@ POST: https://api.ftyeet.something/uploadAsymm
     <-- URL
 ```
 
-* **Upload Symm**
+* **Upload Symm** ✅
 ```
 POST: https://api.ftyeet.something/upload
     --> fileSyntax in Body
@@ -212,7 +212,7 @@ POST: https://api.ftyeet.something/upload
     <-- URL confirmed
 ```
 
-* **Request**
+* **Request** ✅
 * If we're going to be sending password hashes over the internet and hashing it *again*, we need for both end users to know the same SALT to use for hashing the `pwd-hash`. But lowkey I don't trust the end user to do that properly so we're salting with the randomly generated URL
 * The user will request a random, uniquely generated URL word here and use it for both the URL to eventually access the resource *AND* for `pwd-hash`.
 ```
@@ -220,8 +220,10 @@ GET: https://api.ftyeet.something/request
     <-- Unique word for URL
 ```
 
-* **Download Asymm:**
+* **Download Asymm:** 
 * JWT tokens last for 15 seconds. They're meant to be used immediately
+    * Using this because we're not sending the entire public key over the internet
+    * That would be... very dumb
 * Ideally, these tokens are used once
 ```
 POST: https://api.ftyeet.something/auth
@@ -255,7 +257,7 @@ GET: https://api.ftyeet.something/downloadAsymm
         * Request is invalid if 15 seconds has passed
         * Store last nonce used in noSQL database. The next request cannot have the same nonce (to prevent replay attacks - but lowkey if that happens, TLS is compromised and the world is cooked. But hey! If TLS is compromised, at least ftYeet would still be confidential)
 ```
-* **Download Symm**
+* **Download Symm** ✅
 ```
 GET: https://api.ftyeet.something/download
     --> URL
@@ -289,18 +291,18 @@ GET: https://api.ftyeet.something/download
 * We can disable `chmod` and stuff for that app
 * `sudo -u vulnNodeAppUser node /path/to/app/index.js`
 
-## Containerization
-* Docker - not because it's trendy but because I really don't want someone to upload and then execute a script that modifies `/etc/shadow` or smth
+## Containerization ✅
+* Docker - not because it's trendy but because I really don't want someone to upload and then execute a script that modifies `/etc/shadow` or smth  ✅
 * Follow <a href="https://cheatsheetseries.owasp.org/cheatsheets/Docker_Security_Cheat_Sheet.html#:~:text=Docker%20is%20the%20most%20popular,directly%20on%20the%20host%20system.">this</a> ✅
 * We're going to use two containers to isolate the encryption/private key signing process from the ftYeet server ✅
     * Kinda mad I didn't think of this earlier lol ✅
     * Can't access the private key files directly if they're basically on two different file systems (well... different volumes) ✅
     * Tunneled under HTTPS for double encryption just in case something happens ✅
-    * Encrypted/Decrypted text can be in HTTPS body
+    * Encrypted/Decrypted text can be in HTTPS body ✅
 * Use a bridged network (driver) 🙂 This acts as a firewall! Only the two containers can talk to each other ✅
 * Docker compose up? ✅
     * Add SQL server in here too ✅
-    * Add Crypto Server 
+    * Add Crypto Server  ✅
 
 ## Miscellaneous
 * Crypto Server might not need all the encryption files (ie. public keys) since it has no use for any of them
@@ -319,4 +321,4 @@ GET: https://api.ftyeet.something/download
 * Lowkey I want to write a script that prevents a user like apache from doing ANYTHING other than serving a website
 
 ## Plan when I open this next time
-* Fix Docker; GET reqs can't have body
+* AsymmEnc

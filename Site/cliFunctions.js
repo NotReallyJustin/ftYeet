@@ -6,12 +6,14 @@ import * as fileUtil from '../Common/file_util.js';
 
 import { getFile, logSymmFile, runQuery } from './psql.js';
 import { randomBytes } from 'crypto';
-import { asymmEnc, verify, symmDec, symmEnc } from '../Crypto/cryptoFunc.js';
+import { asymmEnc, verify } from '../Crypto/cryptoFunc.js';
 import { hsmEncrypt, hsmDecrypt } from './hsm.js';
 
 export { genURL, uploadSymm, checkURL, downloadSymm }
 
 // ⭐ Formatting note: I use () => {} if there's no side effects. function() {} is used when there is a side effect
+
+// ---------------- Load in secrets + server ---------------------------------------------
 
 /**
  * Temporary key used to HMAC the cryptosystem
@@ -23,6 +25,39 @@ const HMAC_CRYPTOSYS_KEY = "Temporary";
  * Path to store the files in
  */
 const FILE_DIR = "./files/";
+
+// 🔑 Asymm Keys
+
+/**
+ * Crypto public key used for asymmetric encryption.
+ * @type {Buffer}
+ */
+let cryptoPubkey = readFileSync("/run/secrets/crypto_pubkey");
+
+/**
+ * (Ideally) ED-25519 public key used to verify digital signatures
+ * @type {Buffer}
+ */
+let cryptoPubkeySign = readFileSync("/run/secrets/crypto_pubkey_sign");
+
+/**
+ * ⭐ Key object for the public key used for asymm encryption.
+ * This can be decrypted by the HSM eventually
+ * @type {Buffer}
+ */
+let asymmEncKeyObj = cryptoUtil.genPubKeyObject(cryptoPubkey, "binary");
+
+/**
+ * ⭐ Key object for the public (hopefully ED-25519) key.
+ * THIS IS DECRYPTED! YOU CAN VERIFY STUFF WITH THIS!!!
+ * @type {KeyObject}
+ */
+let verifyKeyObj = cryptoUtil.genPubKeyObject(cryptoPubkeySign, "binary");
+
+// "Garbage collect" - well - as much as the mark-and-sweep algorithm will let us
+cryptoUtil.zeroBuffer(cryptoPubkeySign);
+
+// ----------------- Main functionality ------------------------------------------------
 
 /**
  * Fetches a random word. Then, it checks if that word has already been used. If it has, get another word.
