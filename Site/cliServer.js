@@ -162,8 +162,19 @@ apiRouter.post("/uploadAsymm", (request, response) => {
     {
         return response.status(400).send("Error when uploading: The public-key you provided is invalid. It's probably not a public key.");
     }
+
+    if (request.headers['url'] == undefined || !cliFunctions.checkURL(request.headers['url']) 
+        || request.headers['url'].length < 4 || request.headers['url'].length > 10)
+    {
+        return response.status(400).send("Error when uploading: You must provide a valid URL. Make sure you're using the CLI and not tampering with stuff on your own.")
+    }
     
-    response.send("This is the CLI Server. You are uploading asymm.");
+    cliFunctions.uploadAymm(request.body, expireTime, burnOnRead, request.headers['public-key'], request.headers['url'])
+        .then(() => {
+            response.send(request.headers['url']);
+        }).catch(err => {
+            response.status(404).send(`Error when uploading: ${err}.`);
+        });
 });
 
 apiRouter.get("/downloadAsymm", (request, response) => {
@@ -172,7 +183,12 @@ apiRouter.get("/downloadAsymm", (request, response) => {
         return response.status(400).send("Error when downloading: You must provide a valid JWT token signed with your private key. This should be done via the CLI.");
     }
 
-    response.send("This is the CLI Server. You are downloading asymm.");
+    cliFunctions.uploadAymm(request.body, expireTime, burnOnRead, request.headers['public-key'], request.headers['url'])
+        .then(() => {
+            response.send(request.headers['url']);
+        }).catch(err => {
+            response.status(404).send(`Error when uploading: ${err}.`);
+        });
 });
 
 apiRouter.get("/download", (request, response) => {

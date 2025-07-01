@@ -468,34 +468,56 @@ function uploadAsymm(filePath, signKeyPath, signKeyPwd, encKeyPath, dsaPadding, 
         throw `Error when uploading file: Failed to encrypt file. ${err}`;
     }
 
-    // Send fetch request to website
-    fetch(`${HTTPS_TUNNEL}/uploadAsymm`, {
-        method: 'POST',
-        headers: {
-            "expire-time": expireTime,
-            "burn-on-read": burnOnRead,
-            "public-key": cryptoUtil.keyToBase64(encKey, encKeyType),
-            "Content-Type": "application/octet-stream"
-        },
-        body: fileSyntax,
+    // First, fetch a word for URL
+    fetch(`${HTTPS_TUNNEL}/request`, {
+        method: 'GET',
         follow: 1,
         agent: IGNORE_SSL_AGENT
     }).then((response) => {
         if (response.ok)
         {
-            console.log("File successfully encrypted and uploaded.");
-            response.text().then(text => {
-                console.log(`Server Response: ${text}`);
+            response.text().then(url => {
+                
+                // Send fetch request to website
+                fetch(`${HTTPS_TUNNEL}/uploadAsymm`, {
+                    method: 'POST',
+                    headers: {
+                        "expire-time": expireTime,
+                        "burn-on-read": burnOnRead,
+                        "public-key": cryptoUtil.keyToBase64(encKey, encKeyType),
+                        "Content-Type": "application/octet-stream",
+                        "url": url
+                    },
+                    body: fileSyntax,
+                    follow: 1,
+                    agent: IGNORE_SSL_AGENT
+                }).then((response2) => {
+                    if (response2.ok)
+                    {
+                        console.log("Asymmetrically encrypted file has successfully been encrypted and uploaded.");
+                        response2.text().then(text => {
+                            console.log(`Your file can be accessed here with this URL: ${text}. Pass it into the download function.`);
+                        });
+                    }
+                    else
+                    {
+                        response2.text().then(err => {
+                            throw err;
+                        });
+                    }
+                }).catch(err => {
+                    console.error(`Error when uploading file: ${err}`);
+                });
             });
         }
         else
         {
             response.text().then(err => {
-                console.error(err);
+                throw err;
             });
         }
     }).catch(err => {
-        console.error(`Error when uploading file: ${err}`);
+        throw `Error when uploading file: ${err}`;
     });
 }
 

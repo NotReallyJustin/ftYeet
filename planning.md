@@ -175,7 +175,7 @@ For hashes, we'll use `sha3-512`. `sha2` is probably secure enough, but I had to
 ```
 * This makes way more sense when you realize that we're encrypting the files twice
 
-## FtYeet Protocol --> Stateless + JWT ✅
+## FtYeet Protocol --> Stateless
 * Since we're making it stateless, we might as well tunnel the whole thing under HTTPS
     * `certbot` and `LetsEncrypt` only works for HTTPS
     * I guess I could buy a SSL cert but those cost $
@@ -191,7 +191,6 @@ For hashes, we'll use `sha3-512`. `sha2` is probably secure enough, but I had to
 ```
 POST: https://api.ftyeet.something/uploadAsymm
     --> fileSyntax in Body
-    --> file-name
     --> expire-time
     --> burn-on-read
     --> public-key (if needed)
@@ -221,42 +220,27 @@ GET: https://api.ftyeet.something/request
 ```
 
 * **Download Asymm:** 
-* JWT tokens last for 15 seconds. They're meant to be used immediately
-    * Using this because we're not sending the entire public key over the internet
-    * That would be... very dumb
-* Ideally, these tokens are used once
-```
-POST: https://api.ftyeet.something/auth
-    --> JWT Token of URL, timestamp, ip, and nonce - signed w/ end user's private key 
-        * Server verifies with public key on file
-        * IP is there to mitigate/stop replay attacks from unauthorized servers. Prompt user in CLI to put in VPN IP if that's a thing
-    <-- JWT token of URL, new timestamp, ip, jiti (basically new nonce), and matching nonce - signed w/ server's JWT private key
-        * Do we need a jiti?
-        * Store the last hash of the jiti for the URL in the database
-        * Only 1 active jiti at a time
-        * Destroy on read
+* Was going to use JWT, but that was way too overengineered. In addition, that doesn't fit into our stateless design at all since you needed a multi-step protocol just to send the challenge code, authenticate, send back the JWT (but do it such that JWT can only be used once within a limited timeframe), etc.
+* Thought of a genius idea for downloading asymmetrically that's much simpler since we consolidate like 3 of the auth steps into 1
 
-    * The nonce doesn't do anything; it's just there to add randomness to our signature
-    * Client doesn't need to verify JWT signature. Just check that the nonces are the same to ensure the JWT is actually for them
-    * Server will store the nonce
-
-GET: https://api.ftyeet.something/downloadAsymm
-    --> Pass in JWT token from earier
-        * Server verifies IP and timestamp and JITI
-        * Server verifies the signature with its own JWT public key (don't explicitly show this to others)
-    <-- Encrypted file
 ```
-* Alternative Download Asymm idea that might clean a lot of stuff up:
+GET: https://api.ftyeet.something/getAuth
+    --> URL
+
+    <-- Challenge       // This challenge expires after 120 seconds      --> crypto signed
+```
+
 ```
 GET: https://api.ftyeet.something/downloadAsymm
     --> URL
-    --> Pass in JWT token of URL, timestamp, IP, and nonce - signed w/ end user's private key
-        * Restrict it to RS512 or smth
-        * Server verifies JWT token signature using public key on file
-        * Server verifies IP and timestamp. Give users option for VPN
-        * Request is invalid if 15 seconds has passed
-        * Store last nonce used in noSQL database. The next request cannot have the same nonce (to prevent replay attacks - but lowkey if that happens, TLS is compromised and the world is cooked. But hey! If TLS is compromised, at least ftYeet would still be confidential)
+    --> Signed challenge (signed by private key, this of this as ciphertext)
+
+    // The server should have the public key in the database
+    <-- If decrypt(signed challenge) == challenge, send back the file
 ```
+
+* This is cryptographically sound because even if the attacker has the signature and the challenge, it can't forge the signature
+
 * **Download Symm** ✅
 ```
 GET: https://api.ftyeet.something/download
@@ -321,4 +305,6 @@ GET: https://api.ftyeet.something/download
 * Lowkey I want to write a script that prevents a user like apache from doing ANYTHING other than serving a website
 
 ## Plan when I open this next time
-* AsymmEnc
+* AsymmDec
+* If logging fails, delete the file that was written 
+* Maybe move enc out of fetch() portion for symm file upload

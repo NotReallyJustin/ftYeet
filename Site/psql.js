@@ -11,7 +11,7 @@ import { hsmSign } from './hsm.js';
 import { verify } from '../Crypto/cryptoFunc.js';
 import { genPubKeyObject, zeroBuffer } from '../Common/crypto_util.js';
 
-export { runQuery, logSymmFile, getFile }
+export { runQuery, logSymmFile, logAsymmFile, getFile }
 
 // --------- Crypto files ---------
 
@@ -148,7 +148,68 @@ async function logSymmFile(fileName, pwdHash2, burnOnRead, expireTimestamp, url)
     }
     catch(err)
     {
-        throw err.message;
+        throw err.message || err;
+    }
+}
+
+/**
+ * Logs an asymmetrically encrypted file in the postgres database.
+ * @param {String} fileName The name of the file as stored on our end. This should be unique and randomly generated (hopefully)
+ * @param {String} pubkeyB64 The public key, in base64.
+ * @param {boolean} burnOnRead Whether this file should be burnt when we download it
+ * @param {Date} expireTimestamp Timestamp when the file expires (and gets marked for deletion)
+ * @param {String} url URL you can access the file from
+ * @throws If any of the inputs are invalid
+ */
+async function logAsymmFile(fileName, pubkeyB64, burnOnRead, expireTimestamp, url)
+{
+    // We don't immediately create a challenge when the user does asymm file upload
+    // We wait for auth()
+    // We're going to put placeholders when we do the digitally sign the contents in the postgres table
+    let challenge = "null";
+    let challengeExpireTime = new Date(Date.now());
+
+    let hsmMerged = `${fileName} ${pubkeyB64} ${burnOnRead} ${expireTimestamp} ${url} ${challenge} ${challengeExpireTime}`;
+
+    if (fileName == undefined || pubkeyB64 == undefined || burnOnRead == undefined || expireTimestamp == undefined || url == undefined)
+    {
+        console.log(hsmMerged)
+        throw "Error when logging file in database: There's something in the input that is undefined.";
+    }
+
+    if (!(expireTimestamp instanceof Date))
+    {
+        throw "Error when logging file in database: `expireTimestamp` is not a date.";
+    }
+
+    if (!(challengeExpireTime instanceof Date))
+    {
+        throw "Error when logging file in database: `challengeExpireTime` is not a date.";
+    }
+
+    // Generate checksum (read: digital signature) of everything here
+    let checksum;
+    try
+    {
+        checksum = await hsmSign(hsmMerged);
+    }
+    catch(err)
+    {
+        throw err.message || err;
+    }
+
+    // Upload to DB
+    try
+    {
+        console.log(hsmMerged)
+        await runQuery(
+            "INSERT INTO filesAsymm(Name, PubKeyB64, BurnOnRead, ExpireTime, Url, Challenge, ChallengeTime, CheckSum) VALUES($1, $2, $3, $4, $5, $6, $7, $8)",
+            [fileName, pubkeyB64, burnOnRead, expireTimestamp, url, challenge, challengeExpireTime, checksum], false
+        );
+    }
+    catch(err)
+    {
+        throw err.message || err;
     }
 }
 

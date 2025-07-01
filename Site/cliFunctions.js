@@ -4,12 +4,12 @@ import * as cryptoUtil from '../Common/crypto_util.js';
 import * as path from 'path';
 import * as fileUtil from '../Common/file_util.js';
 
-import { getFile, logSymmFile, runQuery } from './psql.js';
+import { getFile, logSymmFile, logAsymmFile, runQuery } from './psql.js';
 import { randomBytes } from 'crypto';
 import { asymmEnc } from '../Crypto/cryptoFunc.js';
 import { hsmEncrypt, hsmDecrypt } from './hsm.js';
 
-export { genURL, uploadSymm, checkURL, downloadSymm }
+export { genURL, uploadSymm, checkURL, downloadSymm, uploadAymm }
 
 // ⭐ Formatting note: I use () => {} if there's no side effects. function() {} is used when there is a side effect
 
@@ -237,6 +237,63 @@ function downloadSymm(url, pwdHash)
                 console.error(`Error in downloadSymm when running SQL: ${err}`);
                 reject("Internal Database Error. Ask the owner of ftYeet to check their logs.");
             });
+    });
+}
+
+/**
+ * Handles asymmetric file upload when the user makes a CLI request
+ * @param {Buffer} data Request data. This should have the encrypted (1x) file contents
+ * @param {Number} expireTime Number of seconds before this file gets deleted
+ * @param {Boolean} burnOnRead Whether to delete the file upon download
+ * @param {String} pubkeyB64 The public key, in base64
+ * @param {String} url The URL you can access the file from
+ * @throws Promise rejects if anything goes wrong with the asymmetric file upload process. If this happens, return a 400 error.
+ * @returns {Promise<>} .then() when it's successful 
+ */
+function uploadAymm(data, expireTime, burnOnRead, pubkeyB64, url)
+{
+return new Promise((resolve, reject) => {
+        
+        // Encrypt the data again (by converting it to - you guessed it - another file syntax!).
+        // This is just like what we did with the symmetric file uploads
+        hsmEncrypt(data).then(symmEnc => {
+            let ciphertext = symmEnc.ciphertext;
+            delete symmEnc.ciphertext;
+            
+            // No need to use asymm file syntax here. If we did use asymm file syntax, the would-be private key would be stored in the
+            // same place as the symmetric key right now. They're equally secure, but file syntax symm is just faster.
+            let encryptedData = cryptoUtil.toFileSyntaxSymm(symmEnc, ciphertext, cryptoUtil.secureKeyGen(HMAC_CRYPTOSYS_KEY, 32, symmEnc.hmacSalt), 'Server');
+
+            secureWrite(encryptedData)
+                .then((pathObjects) => {
+                   
+                    // Before we start, note that we're storing the base64 public key in postgres. The fact that it's base64 makes things A LOT easier for us.
+                    // Also it's a public key. We don't need to protect it.
+
+                    // Write timestamp to database
+                    let expireTimestamp = new Date(Date.now() + expireTime * 1000);
+
+                    logAsymmFile(
+                        pathObjects.fileName, pubkeyB64, burnOnRead, expireTimestamp, url
+                    ).then(() => {
+
+                        // Auto delete process start       
+
+                        console.log(`Data written to ${pathObjects.newFilePath}`);
+                        resolve();
+
+                    }).catch((err) => {
+                        console.error(`Error in uploadAsymm when running SQL: ${err}`);
+                        reject("Internal Database Error. Ask the owner of ftYeet to check their logs.");
+                    });
+                }).catch(err => {
+                    console.error(`Error in uploadAsymm: ${err}`);
+                    reject(err);
+                });
+        }).catch(err => {
+            console.error(`Error in uploadAsymm when making HSM request: ${err}`);
+            reject(err);
+        });
     });
 }
 
