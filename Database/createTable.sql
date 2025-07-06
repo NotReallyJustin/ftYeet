@@ -19,7 +19,7 @@ CREATE TABLE filesAsymm (
     BurnOnRead boolean,
     ExpireTime timestamp,
     Url varchar(512),
-    -- We're only going to need 126 bits/16 bytes for this
+    -- We're only going to need 256 bits/32 bytes for this
     Challenge bytea,
     ChallengeTime timestamp,
     CheckSum varchar(512)

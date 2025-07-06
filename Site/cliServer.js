@@ -33,9 +33,6 @@ const apiRouter = express.Router({
 // ⚠️ Check `/planning.md` for answers about the weird design choices here
 // TLDR: this "API" is only here to tunnel the ftYeet protocol under HTTPS. People should be interacting with this via the CLI.
 
-apiRouter.use("/upload", checkContentType('application/octet-stream'));
-apiRouter.use("/upload", express.raw({limit: MAX_FILE_SIZE, type: 'application/octet-stream'}));
-
 apiRouter.get("/request", (request, response) => {
     cliFunctions.genURL()
         .then(word => {
@@ -46,6 +43,9 @@ apiRouter.get("/request", (request, response) => {
         })
 });
 
+// Symmetric upload. Uploaded data must be in binary.
+apiRouter.use("/upload", checkContentType('application/octet-stream'));
+apiRouter.use("/upload", express.raw({limit: MAX_FILE_SIZE, type: 'application/octet-stream'}));
 apiRouter.post("/upload", (request, response) => {
     
     // Variables because I have a feeling that headers are going to be strings
@@ -109,6 +109,29 @@ apiRouter.post("/upload", (request, response) => {
         })
 });
 
+apiRouter.get("/download", (request, response) => {
+
+    if (request.headers['url'] == undefined || !cliFunctions.checkURL(request.headers['url']) 
+        || request.headers['url'].length < 4 || request.headers['url'].length > 10)
+    {
+        return response.status(400).send("Error when downloading: You must provide a valid URL. Make sure you're using the CLI and not tampering with stuff on your own.")
+    }
+
+    if (request.headers['pwd-hash'] == undefined)
+    {
+        return response.status(400).send("Error when uploading: You must provide a pwd-hash (password hash). This should be done for you via the CLI.");
+    }
+
+    cliFunctions.downloadSymm(request.headers['url'], request.headers['pwd-hash'])
+        .then((fileSyntaxOutput) => {
+            // res.setHeader('content-type', 'text/plain');
+            response.send(fileSyntaxOutput);
+        }).catch(err => {
+            response.status(404).send(`Error when downloading: ${err}.`);
+        });
+});
+
+// Asymmetric upload. Uploaded data must be in binary.
 apiRouter.use("/uploadAsymm", checkContentType('application/octet-stream'));
 apiRouter.use("/uploadAsymm", express.raw({limit: MAX_FILE_SIZE, type: 'application/octet-stream'}));
 apiRouter.post("/uploadAsymm", (request, response) => {
@@ -177,34 +200,37 @@ apiRouter.post("/uploadAsymm", (request, response) => {
         });
 });
 
-apiRouter.get("/downloadAsymm", (request, response) => {
-    if (request.headers['jwt'] == undefined)
+// Authentication for asymmetric download
+apiRouter.get("/getAuth", (request, response) => {
+
+    if (request.headers['url'] == undefined || !cliFunctions.checkURL(request.headers['url']) 
+        || request.headers['url'].length < 4 || request.headers['url'].length > 10)
     {
-        return response.status(400).send("Error when downloading: You must provide a valid JWT token signed with your private key. This should be done via the CLI.");
+        return response.status(400).send("Error when downloading and authenticating: You must provide a valid URL. Make sure you're using the CLI and not tampering with stuff on your own.");
     }
 
-    cliFunctions.uploadAymm(request.body, expireTime, burnOnRead, request.headers['public-key'], request.headers['url'])
-        .then(() => {
-            response.send(request.headers['url']);
+    cliFunctions.generateChallenge(request.headers['url'])
+        .then(challenge => {
+            response.setHeader('content-type', 'application/octet-stream');
+            response.send(challenge);
         }).catch(err => {
-            response.status(404).send(`Error when uploading: ${err}.`);
+            response.status(404).send(err.message || err);
         });
 });
 
-apiRouter.get("/download", (request, response) => {
-
+apiRouter.get("/downloadAsymm", (request, response) => {
     if (request.headers['url'] == undefined || !cliFunctions.checkURL(request.headers['url']) 
         || request.headers['url'].length < 4 || request.headers['url'].length > 10)
     {
         return response.status(400).send("Error when downloading: You must provide a valid URL. Make sure you're using the CLI and not tampering with stuff on your own.")
     }
 
-    if (request.headers['pwd-hash'] == undefined)
+    if (request.headers['signed-challenge'] == undefined)
     {
-        return response.status(400).send("Error when uploading: You must provide a pwd-hash (password hash). This should be done for you via the CLI.");
+        return response.status(400).send("Error when downloading: You must provide a signed-challenge. This should be done for you via the CLI once you request a challenge.");
     }
 
-    cliFunctions.downloadSymm(request.headers['url'], request.headers['pwd-hash'])
+    cliFunctions.downloadAsymm(request.headers['url'], request.headers['signed-challenge'])
         .then((fileSyntaxOutput) => {
             // res.setHeader('content-type', 'text/plain');
             response.send(fileSyntaxOutput);

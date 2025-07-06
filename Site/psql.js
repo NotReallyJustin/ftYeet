@@ -10,8 +10,9 @@ const { Pool } = pg;
 import { hsmSign } from './hsm.js';
 import { verify } from '../Crypto/cryptoFunc.js';
 import { genPubKeyObject, zeroBuffer } from '../Common/crypto_util.js';
+import { verifyChallenge} from './cliFunctions.js';
 
-export { runQuery, logSymmFile, logAsymmFile, getFile }
+export { runQuery, logSymmFile, logAsymmFile, getFile, getFileAsymm, updateChallenge }
 
 // --------- Crypto files ---------
 
@@ -118,7 +119,6 @@ async function logSymmFile(fileName, pwdHash2, burnOnRead, expireTimestamp, url)
 
     if (fileName == undefined || pwdHash2 == undefined || burnOnRead == undefined || expireTimestamp == undefined || url == undefined)
     {
-        console.log(hsmMerged)
         throw "Error when logging file in database: There's something in the input that is undefined.";
     }
 
@@ -173,7 +173,6 @@ async function logAsymmFile(fileName, pubkeyB64, burnOnRead, expireTimestamp, ur
 
     if (fileName == undefined || pubkeyB64 == undefined || burnOnRead == undefined || expireTimestamp == undefined || url == undefined)
     {
-        console.log(hsmMerged)
         throw "Error when logging file in database: There's something in the input that is undefined.";
     }
 
@@ -201,7 +200,6 @@ async function logAsymmFile(fileName, pubkeyB64, burnOnRead, expireTimestamp, ur
     // Upload to DB
     try
     {
-        console.log(hsmMerged)
         await runQuery(
             "INSERT INTO filesAsymm(Name, PubKeyB64, BurnOnRead, ExpireTime, Url, Challenge, ChallengeTime, CheckSum) VALUES($1, $2, $3, $4, $5, $6, $7, $8)",
             [fileName, pubkeyB64, burnOnRead, expireTimestamp, url, challenge, challengeExpireTime, checksum], false
@@ -216,7 +214,7 @@ async function logAsymmFile(fileName, pubkeyB64, burnOnRead, expireTimestamp, ur
 /**
  * Retrieves a file at the specified URL
  * @param {String} url URL where the file is stored
- * @returns {Promise<null | {name: String, pwdhashhash: String, burnonread: Boolean, expiretime: Date, url: String, checksum: String>}} A JSON representing all the data about the file requested in the URL. Or null if the URL is invalid.
+ * @returns {Promise<null | {name: String, pwdhashhash: String, burnonread: Boolean, expiretime: Date, url: String, checksum: String}>} A JSON representing all the data about the file requested in the URL. Or null if the URL is invalid.
  */
 async function getFile(url)
 {
@@ -237,7 +235,7 @@ async function getFile(url)
     }
     catch(err)
     {
-        throw err.message;
+        throw err.message || err;
     }
 
     //dbOutput.rows has > 1 item. A proper output should only have 1 item
@@ -266,6 +264,142 @@ async function getFile(url)
     }
 
     return dbOutput.rows[0];
+}
+
+/**
+ * Helper function to fetch the database entry for an asymmetric file download.
+ * @param {String} url The URL to fetch
+ * @throws If the URL is undefined, or the fileAsymm database entry has been tampered with
+ * @returns {{name: String, pubkeyb64: String, burnonread: Boolean, expiretime: Date, url: String, challenge: Buffer, challengetime: Date, checksum: String}} A JSON representing all the data about the file requested in the URL.
+ */
+async function _fetchFileAsymm(url)
+{
+    if (url == undefined)
+    {
+        throw "Error when accessing data related to asymmetrically encrypted file: `url` is undefined.";
+    }
+    
+    // Retrieve from DB
+    let dbOutput;
+    try
+    {
+        dbOutput = await runQuery(
+            "SELECT * FROM filesAsymm WHERE url = $1",
+            [url]
+        );
+    }
+    catch(err)
+    {
+        throw err.message || err;
+    }
+
+    //dbOutput.rows has > 1 item. A proper output should only have 1 item
+    if (dbOutput.rows.length != 1)
+    {
+        throw `Detected more than one download entry per URL. Aborting now.`;
+    }
+
+    // Similar to fetchFile normally
+    let toReturn = dbOutput.rows[0];
+
+    // Check the checksum
+    let hsmMerged = `${toReturn.name} ${toReturn.pubkeyb64} ${toReturn.burnonread} ${toReturn.expiretime} ${toReturn.url} ${toReturn.challenge} ${toReturn.challengetime}`;
+
+    try
+    {
+        if(!verify(hsmMerged, verifyKeyObj, toReturn.checksum))
+        {
+            throw `Checksum/digital signature verification failed.`;
+        }
+    }
+    catch(err)
+    {
+        throw `Error accessing data related to asymmetrically encrypted file: ${err.message || err}.`;
+    }
+
+    return toReturn;
+}
+
+/**
+ * Updates the challenge for an asymmetric file download.
+ * @param {String} url URL to update the challenge for
+ * @param {Buffer} challenge The new challenge to set for the file
+ * @throws If URL is undefined, or the fileAsymm database entry has been tampered with
+ */
+async function updateChallenge(url, challenge)
+{
+    if (url == undefined)
+    {
+        throw "Error when updating challenge: `url` is undefined.";
+    }
+
+    // Fetch the old SQL table entry and update the challenge
+    let returned;
+    try
+    {
+        returned = await _fetchFileAsymm(url);
+        returned.challenge = challenge;
+        returned.challengetime = new Date(Date.now());
+
+        // Resign the new entry
+        let hsmMerged = `${returned.name} ${returned.pubkeyb64} ${returned.burnonread} ${returned.expiretime} ${returned.url} ${returned.challenge} ${returned.challengetime}`;
+        let checksum = await hsmSign(hsmMerged);
+
+        returned.checksum = checksum;
+    }
+    catch(err)
+    {
+        throw `Error when updating challenge: ${err.message || err}`;
+    }
+
+    // Push updated entry into SQL
+    try
+    {
+        await runQuery(
+            "UPDATE filesAsymm SET Challenge = $1, ChallengeTime = $2, CheckSum = $3 WHERE Url = $4",
+            [returned.challenge, returned.challengetime, returned.checksum, url]
+        );
+    }
+    catch(err)
+    {
+        throw err.message || err;
+    }
+}
+
+/**
+ * Retrieves an asymmetrically encrypted file at the specified URL.
+ * Also does authentication challenge verification before returning the file.
+ * @param {String} url URL to retrieve item at
+ * @param {String} signedChallenge Signed challenge (in hex) to prove the user actually has the private key to decrypt the file
+ * @returns {Promise<null | {name: String, pubkeyb64: String, burnonread: Boolean, expiretime: Date, url: String, challenge: Buffer, challengetime: Date, checksum: String}>} A JSON representing all the data about the file requested in the URL, or null if the URL is invalid.
+ */
+async function getFileAsymm(url, signedChallenge)
+{
+    if (url == undefined)
+    {
+        throw "Error when downloading file: `url` is undefined.";
+    }
+
+    // Fetch the file and check the checksum
+    try
+    {
+        let returned = await _fetchFileAsymm(url);
+
+        // Verify the challenge
+        let challengeSuccessful = verifyChallenge(signedChallenge, returned.challenge, returned.pubkeyb64, returned.challengetime);
+        if (!challengeSuccessful)
+        {
+            throw "Authentication challenge failed. Access to file denied.";
+        }
+
+        // If we got here, the challenge was successful
+        // Just return the file stuff
+        return returned;
+    }
+    catch(err)
+    {
+        throw `Error when downloading file: ${err.message || err}`;
+    }
 }
 
 // If we have SIGINT or SIGTERM, gracefully shut down the pool

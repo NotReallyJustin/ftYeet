@@ -41,20 +41,20 @@ mainServer.use((request, response, next) => {
     }
 });
 
-// Log incoming requests
-mainServer.use("*", (request, response, next) => {
-    console.log("--------------------------------------------------------------------");
-    console.log(`Connection established with ${request.ip} on port ${request.socket.localPort} via remote port ${request.socket.remotePort}.`);
-    console.log(`Request Type: ${request.method}`);
-    console.log(`Request Host: ${request.hostname}`);
-    console.log(`Request Path: ${request.originalUrl}`)
-    console.dir(`DEBUG - Request Headers:`)
-    console.dir(request.headers)
-    console.log("--------------------------------------------------------------------");
-    console.log("");
+// // Log incoming requests
+// mainServer.use("*", (request, response, next) => {
+//     console.log("--------------------------------------------------------------------");
+//     console.log(`Connection established with ${request.ip} on port ${request.socket.localPort} via remote port ${request.socket.remotePort}.`);
+//     console.log(`Request Type: ${request.method}`);
+//     console.log(`Request Host: ${request.hostname}`);
+//     console.log(`Request Path: ${request.originalUrl}`)
+//     console.dir(`DEBUG - Request Headers:`)
+//     console.dir(request.headers)
+//     console.log("--------------------------------------------------------------------");
+//     console.log("");
 
-    next();
-});
+//     next();
+// });
 
 // 404 invalid subdomains
 // This is a whitelist

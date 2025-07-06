@@ -187,7 +187,7 @@ For hashes, we'll use `sha3-512`. `sha2` is probably secure enough, but I had to
     * To bypass this, we're encoding public keys in `base64` ✅
     * This isn't meant to "encrypt" them or to make them more secure; it's a formatting thing ✅
     * I mean public keys aren't meant to be kept secret regardless. Also if you're still paranoid, this whole thing is running over TLS so 🤷‍♂️ ✅
-* **Upload Asymm**:
+* **Upload Asymm**: ✅
 ```
 POST: https://api.ftyeet.something/uploadAsymm
     --> fileSyntax in Body
@@ -308,3 +308,4 @@ GET: https://api.ftyeet.something/download
 * AsymmDec
 * If logging fails, delete the file that was written 
 * Maybe move enc out of fetch() portion for symm file upload
+* Handle verifykeypwd in command tool's asymmdec

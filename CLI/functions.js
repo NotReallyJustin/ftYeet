@@ -532,8 +532,6 @@ function uploadAsymm(filePath, signKeyPath, signKeyPwd, encKeyPath, dsaPadding, 
  */
 function downloadAsymm(dirPath, url, verifyKeyPath, verifyKeyPwd, decKeyPath, decKeyPwd)
 {
-    // test
-    let fileSyntax = readFileSync('./bye.txt');
 
     // Error checks
     if (!fileUtil.exists(dirPath))
@@ -583,7 +581,7 @@ function downloadAsymm(dirPath, url, verifyKeyPath, verifyKeyPwd, decKeyPath, de
     }
     catch(err)
     {
-        throw `Error when uploading file: Failed to read key file ${verifyKeyPath}. ${err}`; 
+        throw `Error when downloading file: Failed to read key file ${verifyKeyPath}. ${err}`; 
     }
 
     let verifyKeyObject;
@@ -593,7 +591,7 @@ function downloadAsymm(dirPath, url, verifyKeyPath, verifyKeyPwd, decKeyPath, de
     }
     catch(err)
     {
-        throw `Error when uploading file: ${err}`; 
+        throw `Error when downloading file: ${err}`; 
     }
 
     let decKey;
@@ -603,24 +601,87 @@ function downloadAsymm(dirPath, url, verifyKeyPath, verifyKeyPwd, decKeyPath, de
     }
     catch(err)
     {
-        throw `Error when uploading file: Failed to read key file ${decKeyPath}. ${err}`; 
+        throw `Error when downloading file: Failed to read key file ${decKeyPath}. ${err}`; 
     }
 
     let decKeyObject;
     try
     {
-        decKeyObject = cryptoUtil.genPrivKeyObject(decKey, true);
+        decKeyObject = cryptoUtil.genPrivKeyObject(decKey, decKeyPwd, true);
     }
     catch(err)
     {
-        throw `Error when uploading file: ${err}`; 
+        throw `Error when downloading file: ${err}`; 
     }
 
-    // Fetch file syntax
-    let restored = cryptoUtil.fromFileSyntaxAsymm({key: verifyKeyObject, passphrase: verifyKeyPwd}, fileSyntax);
-    let plaintext = privateDecrypt({key: decKeyObject, oaepHash: restored.cryptoSystem.oaepHash, padding: restored.cryptoSystem.encryptPadding, passphrase: decKeyPwd}, restored.data);
-    let unFileConstruct = cryptoUtil.fromFileConstruct(plaintext.toString('utf-8'));
+    // First, authenticate
+    fetch(`${HTTPS_TUNNEL}/getAuth`, {
+        method: 'GET',
+        headers: {
+            url: url
+        },
+        follow: 1,
+        agent: IGNORE_SSL_AGENT
+    }).then((response) => {
+        if (response.ok)
+        {
+            response.arrayBuffer().then(challengeAB => {
 
-    // Write to file
-    writeFileSync(`${dirPath}/${unFileConstruct.fileName}`, unFileConstruct.fileContent);
+                // ArrayBuffer != Buffer, so convert it
+                let challenge = Buffer.from(challengeAB);
+                let signedChallenge = cryptoUtil.secureSign('sha3-512', challenge, {key: decKeyObject, passphrase: decKeyPwd, padding: constants.RSA_PKCS1_PSS_PADDING});
+
+                // Now, actually fetch the file
+                fetch(`${HTTPS_TUNNEL}/downloadAsymm`, {
+                    method: 'GET',
+                    headers: {
+                        url: url,
+                        "signed-challenge": signedChallenge
+                    },
+                    follow: 1,
+                    agent: IGNORE_SSL_AGENT
+                }).then((response2) => {
+                    if (response2.ok)
+                    {
+                        response2.arrayBuffer().then(fileSyntaxAB => {
+
+                            // ArrayBuffer != Buffer, so convert it
+                            let fileSyntax = Buffer.from(fileSyntaxAB);
+
+                            // Fetch file syntax
+                            let restored = cryptoUtil.fromFileSyntaxAsymm({key: verifyKeyObject, passphrase: verifyKeyPwd}, fileSyntax);
+                            let plaintext = privateDecrypt({key: decKeyObject, oaepHash: restored.cryptoSystem.oaepHash, padding: restored.cryptoSystem.encryptPadding, passphrase: decKeyPwd}, restored.data);
+                            let unFileConstruct = cryptoUtil.fromFileConstruct(plaintext.toString('utf-8'));
+
+                            // Write the file!
+                            // Doing it recursively to prevent overwrites
+                            let filePath = resolve(dirPath, unFileConstruct.fileName);
+
+                            try
+                            {
+                                fileUtil.writeFileUnique(filePath, unFileConstruct.fileContent);
+                            }
+                            catch(err)
+                            {
+                                fileUtil.writeFileUnique(`./${unFileConstruct.fileName}`, unFileConstruct.fileContent)
+                                throw `Error when downloading file: Failed to write file ${filePath}: ${err}. Attempting to write to current dir.`;
+                            }
+                        });
+                    }
+                    else
+                    {
+                        response2.text().then(err => {
+                            throw `Error when authenticating and downloading file: ${err}`;
+                        });
+                    }
+                });
+            });
+        }
+        else
+        {
+             response.text().then(err => {
+                throw `Error when obtaining auth code and downloading file: ${err}`;
+            });
+        }
+    }); 
 }

@@ -4,12 +4,12 @@ import * as cryptoUtil from '../Common/crypto_util.js';
 import * as path from 'path';
 import * as fileUtil from '../Common/file_util.js';
 
-import { getFile, logSymmFile, logAsymmFile, runQuery } from './psql.js';
-import { randomBytes } from 'crypto';
+import { getFile, logSymmFile, logAsymmFile, runQuery, updateChallenge, getFileAsymm } from './psql.js';
+import { randomBytes, constants } from 'crypto';
 import { asymmEnc } from '../Crypto/cryptoFunc.js';
 import { hsmEncrypt, hsmDecrypt } from './hsm.js';
 
-export { genURL, uploadSymm, checkURL, downloadSymm, uploadAymm }
+export { genURL, uploadSymm, checkURL, downloadSymm, uploadAymm, generateChallenge, verifyChallenge, downloadAsymm }
 
 // ⭐ Formatting note: I use () => {} if there's no side effects. function() {} is used when there is a side effect
 
@@ -174,8 +174,6 @@ function downloadSymm(url, pwdHash)
                     reject(`The URL is either invalid, or it expired.`);
                     return;
                 }
-                
-                // Verify checksum/digital signature - to come later
 
                 // Validate password hash
                 if (cryptoUtil.verifyPwdHash(pwdHash, dbOutput.pwdhashhash))
@@ -295,6 +293,130 @@ return new Promise((resolve, reject) => {
             reject(err);
         });
     });
+}
+
+/**
+ * Generates a challenge for an asymmetric file download (with the given URL).
+ * @param {String} url The URL to generate the challenge for
+ * @returns {Promise<Buffer>} The challenge, which is a random 32-byte buffer
+ */
+function generateChallenge(url)
+{
+    let challenge = randomBytes(32);
+    
+    // Store the challenge in the database
+    return new Promise((resolve, reject) => {
+        updateChallenge(url, challenge)
+            .then(() => {
+                resolve(challenge);
+            }).catch(err => {
+                reject(`Error when generating authentication challenge: ${err}`);
+            });
+    });
+}
+
+/**
+ * Verifies the challenge for an asymmetric file upload, and then downloads the file.
+ * @param {String} url The URL to download the file from
+ * @param {String} signedChallenge Challenge, signed by the recipient's private key, encoded in hex
+ * @throws Error if the challenge verification fails, or if the file doesn't exist
+ * @returns {Promise<Buffer>} The file contents, which should be the encrypted (1x) file contents
+ */
+function downloadAsymm(url, signedChallenge)
+{
+    return new Promise((resolve, reject) => {
+        getFileAsymm(url, signedChallenge)      // Get the file, verify challenge, verify checksum
+            .then(dbOutput => {
+
+                if (dbOutput == null)
+                {
+                    reject(`The URL is either invalid, or it expired.`);
+                    return;
+                }
+
+                // If it's burn on read, delete the entry
+                if (cryptoUtil.burnOnRead)
+                {
+                    // Initiate deletion
+                }
+                
+                // ⭐ If everything is good, read the file and resolve the output
+                let filePath = path.resolve(FILE_DIR, dbOutput.name);
+                let fileSyntax;
+
+                try
+                {
+                    fileSyntax = readFileSync(filePath);
+                }
+                catch(err)
+                {
+                    console.error(`Error in downloadAsymm when reading ${filePath}: ${err}`);
+                    reject(`Unable to retrieve file from ftyeet. The sender likely sent a malformed file.`);
+                }
+
+                // You usually can't work with file syntax. This resolves it.
+                let restored;
+                let restored_hsm_fmt;
+
+                try
+                {
+                    restored = cryptoUtil.fromFileSyntaxSymm(undefined, HMAC_CRYPTOSYS_KEY, fileSyntax);
+
+                    // Things are formatted *slightly* differently in the HSM, so pay attention since we're
+                    // coming from file syntax. In file syntax, the ciphertext == data, and the cryptosystem is seperated.
+                    // so...
+                    restored_hsm_fmt = restored.cryptoSystem;
+                    restored_hsm_fmt.ciphertext = restored.data;
+                }
+                catch(err)
+                {
+                    console.error(`Error when converting from file syntax: ${err}`);
+                    reject(`Unable to retrieve file from ftyeet. ${err}`);
+                }
+
+                // Decrypt HSM to get user's E2EE file
+                hsmDecrypt(restored_hsm_fmt)
+                    .then(decrypted => {
+                        resolve(decrypted);
+                    }).catch(err => {
+                        console.error(`Error when decrypting file syntax: ${err}`);
+                        reject(`Unable to retrieve file from ftyeet. ${err}`);
+                    });
+
+            }).catch(err => {
+                console.error(`Error in downloadAsymm when running SQL: ${err}`);
+                reject("Internal Database Error. Ask the owner of ftYeet to check their logs.");
+            });
+    });
+}
+
+/**
+ * Verifies the challenge for an asymmetric file download.
+ * @param {String} signedChallenge Challenge, signed (in hex)
+ * @param {Buffer} challenge Challenge
+ * @param {String} pubkeyB64 Public key, in base64
+ * @param {Date} challengeTime The time the challenge was generated at. There's only 120 seconds to verify by the way.
+ * @throws Error if public key process or verification process errors
+ * @returns {Boolean} Whether the challenge is valid
+ */
+const verifyChallenge = (signedChallenge, challenge, pubkeyB64, challengeTime) => {
+
+    // Generate public key object you can verify with!
+    try
+    {
+        let pubKeyObj = cryptoUtil.genPubKeyObject(pubkeyB64, 'base64');
+        const cryptoMatches = cryptoUtil.secureVerify('sha3-512', challenge, {key: pubKeyObj, padding: constants.RSA_PKCS1_PSS_PADDING}, signedChallenge);
+
+        // time challenge
+        let timeDiff = Date.now() - challengeTime.getTime();
+        const timeWithinBounds = timeDiff <= 120000; // 120s
+
+        return cryptoMatches && timeWithinBounds;
+    }
+    catch(err)
+    {
+        throw `Error when verifying challenge: ${err}`;
+    }
 }
 
 /**
