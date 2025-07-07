@@ -148,6 +148,18 @@ function uploadSymm(filePath, password, encAlg, authCode, expireTime, burnOnRead
         throw `Error when uploading file: ${encAlg} is not a supported encryption algorithm.`;
     }
 
+    // Before we fetch, we're going to encrypt to make things nicer :)
+    // Symmetrically encrypt and HMAC the file path and name (using the file construct structure we came up with)
+    let fileConstruct = cryptoUtil.toFileConstruct(basename(filePath), plaintext);
+    let symmEnc = cryptoUtil.symmetricEncrypt(password, authCode, Buffer.from(fileConstruct, 'utf-8'), encAlg, encAlg == 'aes-256-cbc' ? 16 : 12);
+    
+    let ciphertext = symmEnc.ciphertext;
+    delete symmEnc.ciphertext;
+
+    // Convert to file syntax
+    let hmacCryptosys = cryptoUtil.secureKeyGen(authCode, 32, symmEnc.hmacSalt);
+    let fileSyntax = cryptoUtil.toFileSyntaxSymm(symmEnc, ciphertext, hmacCryptosys, 'CLI');
+
     // First, fetch a word
     fetch(`${HTTPS_TUNNEL}/request`, {
         method: 'GET',
@@ -167,17 +179,6 @@ function uploadSymm(filePath, password, encAlg, authCode, expireTime, burnOnRead
                 {
                     throw `Error when uploading file: Failed to read file ${filePath}. ${err};`;
                 }
-                
-                // Symmetrically encrypt and HMAC the file path and name (using the file construct structure we came up with)
-                let fileConstruct = cryptoUtil.toFileConstruct(basename(filePath), plaintext);
-                let symmEnc = cryptoUtil.symmetricEncrypt(password, authCode, Buffer.from(fileConstruct, 'utf-8'), encAlg, encAlg == 'aes-256-cbc' ? 16 : 12);
-                
-                let ciphertext = symmEnc.ciphertext;
-                delete symmEnc.ciphertext;
-
-                // Convert to file syntax
-                let hmacCryptosys = cryptoUtil.secureKeyGen(authCode, 32, symmEnc.hmacSalt);
-                let fileSyntax = cryptoUtil.toFileSyntaxSymm(symmEnc, ciphertext, hmacCryptosys, 'CLI');
                 
                 // Generate SALT to hash password with --> This is the hash of the URL
                 let urlHash = cryptoUtil.genHash(salt, 'sha3-256');

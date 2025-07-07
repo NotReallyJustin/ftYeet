@@ -305,7 +305,7 @@ GET: https://api.ftyeet.something/download
 * Lowkey I want to write a script that prevents a user like apache from doing ANYTHING other than serving a website
 
 ## Plan when I open this next time
-* AsymmDec
 * If logging fails, delete the file that was written 
 * Maybe move enc out of fetch() portion for symm file upload
 * Handle verifykeypwd in command tool's asymmdec
+* Error handle
