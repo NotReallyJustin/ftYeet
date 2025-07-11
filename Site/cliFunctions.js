@@ -1,5 +1,5 @@
 import * as https from 'https';
-import { writeFile, chmod, readFileSync } from 'fs';
+import { writeFile, chmod, readFileSync, rmSync } from 'fs';
 import * as cryptoUtil from '../Common/crypto_util.js';
 import * as path from 'path';
 import * as fileUtil from '../Common/file_util.js';
@@ -53,9 +53,6 @@ const genURL = () => new Promise((resolve, reject) => {
     var wordLen = Math.floor(Math.random() * 4) + 7;
     let word = "";
 
-    // !!!Heroku app is down FOR NOW!!!
-    resolve("helllooooo");
-    return;
     const testWord = async () => {
         
         https.get(`https://random-word-api.herokuapp.com/word?length=${wordLen}`, response => { 
@@ -88,19 +85,24 @@ const genURL = () => new Promise((resolve, reject) => {
 
 /**
  * Check to ensure that the URL we have isn't already in use
- * @param {String} url The URL to check 
+ * @param {String} url The URL to check
  * @throws Errors if the SQL fails
  * @returns {Promise<Boolean>} Whether or not the URL is free
  */
 const checkURL = async (url) => {
-    runQuery("SELECT * FROM files WHERE Url=$1", [url])
-        .then(result => {
-            // Rows contains the actual stuff
-            return result.rows.length == 0;
-        }).catch((err) => {
-            console.error(`Error in uploadSymm when running SQL: ${err}`);
-            throw "Internal Database Error. Ask the owner of ftYeet to check their logs.";
-        });
+    
+    // Rows contains the actual stuff
+    try
+    {
+        let validInSymm = await runQuery("SELECT * FROM files WHERE Url=$1", [url]).rows.length == 0;
+        let validInAsymm = await runQuery("SELECT * FROM filesAsymm WHERE Url=$1", [url]).rows.length == 0;
+
+        return validInAsymm && validInSymm;
+    }
+    catch(err)
+    {
+        console.error(`Error when running SQL to validate URL ${url}: ${err}`);
+    }
 }
 
 /**
@@ -142,6 +144,17 @@ function uploadSymm(data, expireTime, burnOnRead, pwdHash, url)
                         resolve();
 
                     }).catch((err) => {
+
+                        // If writing fails, delete the file
+                        try
+                        {
+                            rmSync(pathObjects, {force: true});
+                        }
+                        catch(err)
+                        {
+                            console.error(`Failed to remove file ${pathObjects} when logging fails: ${err}.`)
+                        }
+                        
                         console.error(`Error in uploadSymm when running SQL: ${err}`);
                         reject("Internal Database Error. Ask the owner of ftYeet to check their logs.");
                     });
@@ -281,6 +294,17 @@ return new Promise((resolve, reject) => {
                         resolve();
 
                     }).catch((err) => {
+
+                        // If writing fails, delete the file
+                        try
+                        {
+                            rmSync(pathObjects, {force: true});
+                        }
+                        catch(err)
+                        {
+                            console.error(`Failed to remove file ${pathObjects} when logging fails: ${err}.`)
+                        }
+
                         console.error(`Error in uploadAsymm when running SQL: ${err}`);
                         reject("Internal Database Error. Ask the owner of ftYeet to check their logs.");
                     });

@@ -87,7 +87,7 @@ For hashes, we'll use `sha3-512`. `sha2` is probably secure enough, but I had to
 * `Node.js` doesn't have `argon2` but it does have `scrypt` which is more resistant against brute force attacks w/ support from hardware and those AI/ML GPUs 🤔 
 * TLDR - We're using `scrypt` 
 
-## Database
+## Database ✅
 * Stores: URLCode, filePath, Hash of PwdHash/PubKey, expireTime, burnOnRead, HMAC-Entries
 * Sort by expireTime
 * Was thinking column level encryption but like the most sensitive thing is already hashed. Yay I guess you get a user's public key 😪 What are you gonna do with it? I don't really know
@@ -175,7 +175,7 @@ For hashes, we'll use `sha3-512`. `sha2` is probably secure enough, but I had to
 ```
 * This makes way more sense when you realize that we're encrypting the files twice
 
-## FtYeet Protocol --> Stateless
+## FtYeet Protocol --> Stateless ✅
 * Since we're making it stateless, we might as well tunnel the whole thing under HTTPS
     * `certbot` and `LetsEncrypt` only works for HTTPS
     * I guess I could buy a SSL cert but those cost $
@@ -219,7 +219,7 @@ GET: https://api.ftyeet.something/request
     <-- Unique word for URL
 ```
 
-* **Download Asymm:** 
+* **Download Asymm:**  ✅
 * Was going to use JWT, but that was way too overengineered. In addition, that doesn't fit into our stateless design at all since you needed a multi-step protocol just to send the challenge code, authenticate, send back the JWT (but do it such that JWT can only be used once within a limited timeframe), etc.
 * Thought of a genius idea for downloading asymmetrically that's much simpler since we consolidate like 3 of the auth steps into 1
 
@@ -254,7 +254,7 @@ GET: https://api.ftyeet.something/download
 * **405 ERRORS**
     * I know it's good practice to return `405` errors, but that could be exploited by adversaries to unintentionally find and flood API endpoints.
     * Instead, we're going to 
-* **Subdomains**
+* **Subdomains** ✅
     * Use `express-subdomain` to handle this
     * We're going to try to merge the `ftYeet` protocol tunneling with the genuine website in one go by manipulating React Routers as a shortcut
     * To test locally, modify `hosts` file in `system32/drivers/etc`
@@ -305,7 +305,6 @@ GET: https://api.ftyeet.something/download
 * Lowkey I want to write a script that prevents a user like apache from doing ANYTHING other than serving a website
 
 ## Plan when I open this next time
-* If logging fails, delete the file that was written 
-* Maybe move enc out of fetch() portion for symm file upload
+* Test new word API
 * Handle verifykeypwd in command tool's asymmdec
 * Error handle
