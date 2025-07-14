@@ -49,7 +49,6 @@ let asymmEncKeyObj = cryptoUtil.genPubKeyObject(cryptoPubkey, "binary");
  * @returns {Promise<String>} A random word to use in the URL
  */
 const genURL = () => new Promise((resolve, reject) => {
-    //TODO once we have db: Check to ensure that we don't have overlap
     var wordLen = Math.floor(Math.random() * 4) + 7;
     let word = "";
 
@@ -63,7 +62,7 @@ const genURL = () => new Promise((resolve, reject) => {
             response.on('end', async () => {
                 word = JSON.parse(word);
 
-                if (await checkURL(word))    // If the URL is free
+                if (await checkURL(word[0]))    // If the URL is free
                 {
                     resolve(word[0]);
                 }
@@ -90,18 +89,19 @@ const genURL = () => new Promise((resolve, reject) => {
  * @returns {Promise<Boolean>} Whether or not the URL is free
  */
 const checkURL = async (url) => {
-    
     // Rows contains the actual stuff
     try
     {
-        let validInSymm = await runQuery("SELECT * FROM files WHERE Url=$1", [url]).rows.length == 0;
-        let validInAsymm = await runQuery("SELECT * FROM filesAsymm WHERE Url=$1", [url]).rows.length == 0;
+        let validInSymm = (await runQuery("SELECT * FROM files WHERE Url=$1", [url])).length == 0;
+        let validInAsymm = (await runQuery("SELECT * FROM filesAsymm WHERE Url=$1", [url])).length == 0;
 
+        console.log(validInAsymm && validInSymm)
         return validInAsymm && validInSymm;
     }
     catch(err)
     {
         console.error(`Error when running SQL to validate URL ${url}: ${err}`);
+        throw err;
     }
 }
 
@@ -367,6 +367,9 @@ function downloadAsymm(url, signedChallenge)
                 // ⭐ If everything is good, read the file and resolve the output
                 let filePath = path.resolve(FILE_DIR, dbOutput.name);
                 let fileSyntax;
+
+                let c = undefined;
+                c.a.help();
 
                 try
                 {

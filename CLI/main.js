@@ -44,53 +44,59 @@ program
     .option('-k, --privatekey-cipher [aes-256-cbc]', 'symmetric cipher to encrypt private key file with. Must be used with -o')
     .option('-o, --passphrase [password]', 'passphrase to encrypt private key file with. Must be used with -k')
     .action((options) => {
-        let algorithm = options.algorithm;
-        let pubKE = {
-            type: options.pubkeyEncodingType,
-            format: options.encodingFormat
-        };
-
-        let privKE;
-
-        // Private key is encrypted
-        if (options.privatekeyCipher != undefined || options.passphrase != undefined)
+        try
         {
-            // Both filled in
-            if (options.privatekeyCipher != undefined && options.passphrase != undefined)
+            let algorithm = options.algorithm;
+            let pubKE = {
+                type: options.pubkeyEncodingType,
+                format: options.encodingFormat
+            };
+
+            let privKE;
+
+            // Private key is encrypted
+            if (options.privatekeyCipher != undefined || options.passphrase != undefined)
             {
-                privKE = {
-                    type: options.privkeyEncodingType,
-                    format: options.encodingFormat,
-                    cipher: options.privatekeyCipher,
-                    passphrase: options.passphrase
-                };
+                // Both filled in
+                if (options.privatekeyCipher != undefined && options.passphrase != undefined)
+                {
+                    privKE = {
+                        type: options.privkeyEncodingType,
+                        format: options.encodingFormat,
+                        cipher: options.privatekeyCipher,
+                        passphrase: options.passphrase
+                    };
+                }
+                else
+                {
+                    // only one filled in
+                    throw "Error: Both the passphrase and the cipher algorithm must be filled in if you're encrypting the private key.";
+                }
             }
             else
             {
-                // only one filled in
-                throw "Error: Both the passphrase and the cipher algorithm must be filled in if you're encrypting the private key.";
+                privKE = {
+                    type: options.privkeyEncodingType,
+                    format: options.encodingFormat
+                };
             }
+
+            let pubPath = options.publicKeyPath;
+            let privPath = options.privateKeyPath;
+
+            [
+                'pubkeyEncodingType', 'privkeyEncodingType', 'encodingFormat', 'algorithm', 'publicKeyPath', 'privateKeyPath', 'privatekeyCipher', 'passphrase'
+            ].forEach(key => delete options[key]);
+
+            options.publicKeyEncoding = pubKE;
+            options.privateKeyEncoding = privKE;
+            functions.keygen(pubPath, privPath, algorithm, options);
         }
-        else
+        catch(err)
         {
-            privKE = {
-                type: options.privkeyEncodingType,
-                format: options.encodingFormat
-            };
+            console.error(err.message || err);
         }
-
-        let pubPath = options.publicKeyPath;
-        let privPath = options.privateKeyPath;
-
-        [
-            'pubkeyEncodingType', 'privkeyEncodingType', 'encodingFormat', 'algorithm', 'publicKeyPath', 'privateKeyPath', 'privatekeyCipher', 'passphrase'
-        ].forEach(key => delete options[key]);
-
-        options.publicKeyEncoding = pubKE;
-        options.privateKeyEncoding = privKE;
-        functions.keygen(pubPath, privPath, algorithm, options);
-    })
-;
+    });
 
 program
     .command("upload")
@@ -102,11 +108,17 @@ program
     .option('-t, --expire-time [seconds]', 'how long the server should hold on to the uploaded file; must be >= 60', forceNum, 60)
     .option('-b, --burn', 'whether to burn the file upon download', false)
     .action((options) => {
-        functions.uploadSymm(options.file, options.password, options.algorithm, options.authCode != undefined ? options.authCode : options.password, 
-            options.expireTime, options.burn
-        );
-    })
-;
+        try
+        {
+            functions.uploadSymm(options.file, options.password, options.algorithm, options.authCode != undefined ? options.authCode : options.password, 
+                options.expireTime, options.burn
+            );
+        }
+        catch(err)
+        {
+            console.error(err.message || err);
+        }
+    });
 
 program
     .command("download")
@@ -118,9 +130,15 @@ program
         'decryption may fail if this does not match the one used to encrypt', 'chacha20-poly1305')
     .option('-c, --auth-code [password]', 'authentication code used to verify file HMAC; password would be used if this is left empty')
     .action((options) => {
-        functions.downloadSymm(options.directory, options.password, options.algorithm, options.authCode != undefined ? options.authCode : options.password, options.url);
+        try
+        {
+            functions.downloadSymm(options.directory, options.password, options.algorithm, options.authCode != undefined ? options.authCode : options.password, options.url);
+        }
+        catch(err)
+        {
+            console.error(err.message || err);
+        }
     });
-;
 
 program
     .command("upload-asymm")
@@ -136,10 +154,16 @@ program
     .option('-t, --expire-time [seconds]', 'how long the server should hold on to the uploaded file; must be >= 60', forceNum, 60)
     .option('-b, --burn', 'whether to burn the file upon download', false)
     .action((options) => {
-        functions.uploadAsymm(options.file, options.signatureKey, options.signatureKeyPwd, options.encryptionKey, 
-            options.signaturePadding, options.encryptionPadding, options.expireTime, options.burn);
-    })
-;
+        try
+        {
+            functions.uploadAsymm(options.file, options.signatureKey, options.signatureKeyPwd, options.encryptionKey, 
+                options.signaturePadding, options.encryptionPadding, options.expireTime, options.burn);
+        }
+        catch(err)
+        {
+            console.error(err.message || err);
+        }
+    });
 
 program
     .command("download-asymm")
@@ -149,10 +173,15 @@ program
     .requiredOption('-e, --decryption-key <path>', 'path of key file used to decrypt your file; usually, this is your private key')
     .requiredOption('-s, --verify-key <path>', 'path of key file used to verify the signature of your downloaded file; usually, this is the sender\'s public key')
     .option('-o, --decryption-key-pwd [password]', 'password for your decryption key file, if you have one')
-    .option('-p, --verify-key-pwd [password]', 'password for your verification key file, if you have one')
     .action((options) => {
-        functions.downloadAsymm(options.directory, options.url, options.verifyKey, options.verifyKeyPwd, options.decryptionKey, options.decryptionKeyPwd);
-    })
-;
+        try
+        {
+            functions.downloadAsymm(options.directory, options.url, options.verifyKey, options.decryptionKey, options.decryptionKeyPwd);
+        }
+        catch(err)
+        {
+            console.error(err.message || err);
+        }
+    });
 
 program.parse(process.argv);

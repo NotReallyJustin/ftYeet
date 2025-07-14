@@ -306,5 +306,4 @@ GET: https://api.ftyeet.something/download
 
 ## Plan when I open this next time
 * Test new word API
-* Handle verifykeypwd in command tool's asymmdec
 * Error handle
