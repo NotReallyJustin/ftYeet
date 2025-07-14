@@ -92,10 +92,9 @@ const checkURL = async (url) => {
     // Rows contains the actual stuff
     try
     {
-        let validInSymm = (await runQuery("SELECT * FROM files WHERE Url=$1", [url]));
-        let validInAsymm = (await runQuery("SELECT * FROM filesAsymm WHERE Url=$1", [url])).length == 0;
+        let validInSymm = (await runQuery("SELECT * FROM files WHERE Url=$1", [url])).rows.length == 0;
+        let validInAsymm = (await runQuery("SELECT * FROM filesAsymm WHERE Url=$1", [url])).rows.length == 0;
 
-        console.log(validInAsymm);
         return validInAsymm && validInSymm;
     }
     catch(err)
@@ -367,9 +366,6 @@ function downloadAsymm(url, signedChallenge)
                 // ⭐ If everything is good, read the file and resolve the output
                 let filePath = path.resolve(FILE_DIR, dbOutput.name);
                 let fileSyntax;
-
-                let c = undefined;
-                c.a.help();
 
                 try
                 {

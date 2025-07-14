@@ -177,7 +177,7 @@ function uploadSymm(filePath, password, encAlg, authCode, expireTime, burnOnRead
                 }
                 catch(err)
                 {
-                    throw `Error when uploading file: Failed to read file ${filePath}. ${err};`;
+                    console.error(`Error when uploading file: Failed to read file ${filePath}. ${err};`);
                 }
                 
                 // Generate SALT to hash password with --> This is the hash of the URL
@@ -207,22 +207,22 @@ function uploadSymm(filePath, password, encAlg, authCode, expireTime, burnOnRead
                     else
                     {
                         response2.text().then(err => {
-                            throw err;
+                            console.error(`Error when uploading file: ${err}`);
                         });
                     }
                 }).catch(err => {
-                    throw `Error when uploading file: ${err}`;
+                    console.error(`Error when uploading file: ${err}`);
                 });
             });
         }
         else
         {
             response.text().then(err => {
-                throw err;
+                console.error(`Error when uploading file: ${err}`);
             });
         }
     }).catch(err => {
-        throw `Error when uploading file: ${err}`;
+        console.error(`Error when uploading file: ${err}`);
     });
 }
 
@@ -294,11 +294,11 @@ function downloadSymm(dirPath, password, encAlg, authCode, url)
         else
         {
             response.text().then(err => {
-                throw `Error when downloading file: ${err}`;
+                console.error(`Error when downloading file: ${err}`);
             });
         }
     }).catch(err => {
-        throw `Error when downloading file: ${err}`;
+        console.error(`Error when downloading file: ${err}`);
     });
 }
 
@@ -503,7 +503,7 @@ function uploadAsymm(filePath, signKeyPath, signKeyPwd, encKeyPath, dsaPadding, 
                     else
                     {
                         response2.text().then(err => {
-                            throw err;
+                            console.error(err);
                         });
                     }
                 }).catch(err => {
@@ -514,11 +514,11 @@ function uploadAsymm(filePath, signKeyPath, signKeyPwd, encKeyPath, dsaPadding, 
         else
         {
             response.text().then(err => {
-                throw err;
+                console.error(`Error when uploading file: ${err}`);
             });
         }
     }).catch(err => {
-        throw `Error when uploading file: ${err}`;
+        console.error(`Error when uploading file: ${err}`);
     });
 }
 
@@ -649,7 +649,7 @@ function downloadAsymm(dirPath, url, verifyKeyPath, decKeyPath, decKeyPwd)
                             let fileSyntax = Buffer.from(fileSyntaxAB);
 
                             // Fetch file syntax
-                            let restored = cryptoUtil.fromFileSyntaxAsymm({key: verifyKeyObject, passphrase: verifyKeyPwd}, fileSyntax);
+                            let restored = cryptoUtil.fromFileSyntaxAsymm({key: verifyKeyObject}, fileSyntax);
                             let plaintext = privateDecrypt({key: decKeyObject, oaepHash: restored.cryptoSystem.oaepHash, padding: restored.cryptoSystem.encryptPadding, passphrase: decKeyPwd}, restored.data);
                             let unFileConstruct = cryptoUtil.fromFileConstruct(plaintext.toString('utf-8'));
 
@@ -664,14 +664,14 @@ function downloadAsymm(dirPath, url, verifyKeyPath, decKeyPath, decKeyPwd)
                             catch(err)
                             {
                                 fileUtil.writeFileUnique(`./${unFileConstruct.fileName}`, unFileConstruct.fileContent)
-                                throw `Error when downloading file: Failed to write file ${filePath}: ${err}. Attempting to write to current dir.`;
+                                console.error(`Error when downloading file: Failed to write file ${filePath}: ${err}. Attempting to write to current dir.`);
                             }
                         });
                     }
                     else
                     {
                         response2.text().then(err => {
-                            throw `Error when authenticating and downloading file: ${err}`;
+                            console.error(`Error when authenticating and downloading file: ${err}`);
                         });
                     }
                 });
@@ -680,7 +680,7 @@ function downloadAsymm(dirPath, url, verifyKeyPath, decKeyPath, decKeyPwd)
         else
         {
              response.text().then(err => {
-                throw `Error when obtaining auth code and downloading file: ${err}`;
+                console.error(`Error when obtaining auth code and downloading file: ${err}`);
             });
         }
     }); 
