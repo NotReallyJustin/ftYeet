@@ -527,11 +527,10 @@ function uploadAsymm(filePath, signKeyPath, signKeyPwd, encKeyPath, dsaPadding, 
  * @param {String} dirPath Directory to download file into
  * @param {String} url URL where the resource/file is stored on the ftYeet server
  * @param {String} verifyKeyPath Key file for verifying file signatures
- * @param {String|undefined} verifyKeyPwd Password to decrypt `verifyKeyPath`, if any.
  * @param {String} decKeyPath Key file for decrypting file contents
  * @param {String|undefined} decKeyPwd Password fo decrypt `decKeyPath`, if any.
  */
-function downloadAsymm(dirPath, url, verifyKeyPath, verifyKeyPwd, decKeyPath, decKeyPwd)
+function downloadAsymm(dirPath, url, verifyKeyPath, decKeyPath, decKeyPwd)
 {
 
     // Error checks
