@@ -305,5 +305,6 @@ GET: https://api.ftyeet.something/download
 * Lowkey I want to write a script that prevents a user like apache from doing ANYTHING other than serving a website
 
 ## Plan when I open this next time
-* Test new word API
-* Error handle
+* Write code in SQL for deletion
+* Write code to scan for anything that's old/expired
+* Write code for auto-delete

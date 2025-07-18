@@ -4,7 +4,7 @@ import * as cryptoUtil from '../Common/crypto_util.js';
 import * as path from 'path';
 import * as fileUtil from '../Common/file_util.js';
 
-import { getFile, logSymmFile, logAsymmFile, runQuery, updateChallenge, getFileAsymm } from './psql.js';
+import { getFile, logSymmFile, logAsymmFile, runQuery, updateChallenge, getFileAsymm, deleteFileAsymm, deleteFileSymm } from './psql.js';
 import { randomBytes, constants } from 'crypto';
 import { asymmEnc } from '../Crypto/cryptoFunc.js';
 import { hsmEncrypt, hsmDecrypt } from './hsm.js';
@@ -195,9 +195,12 @@ function downloadSymm(url, pwdHash)
                 }
 
                 // If it's burn on read, delete the entry
-                if (cryptoUtil.burnOnRead)
+                if (dbOutput.burnonread)
                 {
                     // Initiate deletion
+                    deleteFileSymm(url).catch(err => {
+                        console.error(err);
+                    });
                 }
                 
                 // ⭐ If everything is good, read the file and resolve the output
@@ -358,9 +361,12 @@ function downloadAsymm(url, signedChallenge)
                 }
 
                 // If it's burn on read, delete the entry
-                if (cryptoUtil.burnOnRead)
+                if (dbOutput.burnonread)
                 {
                     // Initiate deletion
+                    deleteFileAsymm(url).catch(err => {
+                        console.log(err);
+                    });
                 }
                 
                 // ⭐ If everything is good, read the file and resolve the output

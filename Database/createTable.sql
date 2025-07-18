@@ -10,7 +10,9 @@ CREATE TABLE files (
     BurnOnRead boolean,
     ExpireTime timestamp,
     Url varchar(512),
-    CheckSum varchar(512)
+    CheckSum varchar(512),
+    -- URL should be unique
+    UNIQUE(Url)
 );
 
 CREATE TABLE filesAsymm (
@@ -22,5 +24,7 @@ CREATE TABLE filesAsymm (
     -- We're only going to need 256 bits/32 bytes for this
     Challenge bytea,
     ChallengeTime timestamp,
-    CheckSum varchar(512)
+    CheckSum varchar(512),
+    -- URL should be unique
+    UNIQUE(Url)
 );

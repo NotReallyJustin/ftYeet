@@ -12,7 +12,7 @@ import { verify } from '../Crypto/cryptoFunc.js';
 import { genPubKeyObject, zeroBuffer } from '../Common/crypto_util.js';
 import { verifyChallenge} from './cliFunctions.js';
 
-export { runQuery, logSymmFile, logAsymmFile, getFile, getFileAsymm, updateChallenge }
+export { runQuery, logSymmFile, logAsymmFile, getFile, getFileAsymm, updateChallenge, deleteFileSymm, deleteFileAsymm }
 
 // --------- Crypto files ---------
 
@@ -400,6 +400,54 @@ async function getFileAsymm(url, signedChallenge)
     {
         throw `Error when downloading file: ${err.message || err}`;
     }
+}
+
+/**
+ * Deletes a file from a given table with the specified URL
+ * @param {String} url URL of file to delete
+ * @param {String} table Table name. Must be `filesAsymm` or `files`
+ * @throws Error if the table name is not `filesAsymm` or `files`
+ */
+async function deleteFile(url, table)
+{
+    if (table != "filesAsymm" && table != "files")
+    {
+        throw `Error when deleting file: $table variable must be filesAsymm or files.`;
+    }
+
+    try
+    {
+        // parameterized queries in postgres do not work with table names
+        // This is fine because we heavily constrained the input this function accepts above
+        await runQuery(
+            `DELETE FROM ${table} WHERE Url = $1`,
+            [url]
+        );
+    }
+    catch(err)
+    {
+        throw `Error when deleting file ${url} from ${table}:  ${err.message || err}`;
+    }
+}
+
+/**
+ * Deletes a file from the symmetric SQL table
+ * @param {String} url URL to delete
+ * @throws Error if deletion process went wrong
+ */
+async function deleteFileSymm(url)
+{
+    await deleteFile(url, "files");
+}
+
+/**
+ * Deletes a file from the asymmetric SQL table
+ * @param {String} url URL to delete
+ * @throws Error if deletion process went wrong
+ */
+async function deleteFileAsymm(url)
+{
+    await deleteFile(url, "filesAsymm");
 }
 
 // If we have SIGINT or SIGTERM, gracefully shut down the pool
