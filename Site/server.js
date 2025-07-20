@@ -7,6 +7,7 @@ import subdomain from 'express-subdomain'
 import * as path from 'path';
 import { createServer } from 'https';
 import { readFileSync } from 'fs';
+import { spawn } from 'child_process';
 
 import webRouter from './webServer.js';
 import apiRouter from './cliServer.js';
@@ -108,3 +109,6 @@ httpsServer.listen(PORT, () => {
 mainServer.listen(80, () => {
     console.log(`✅ HTTP Server launched on port 80. This is only going to be used for redirection.`);
 });
+
+// ♻️ Spawn deletion service
+spawn("./deletionServ.js", [], {stdio: 'inherit'});

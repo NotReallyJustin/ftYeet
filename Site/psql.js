@@ -12,7 +12,7 @@ import { verify } from '../Crypto/cryptoFunc.js';
 import { genPubKeyObject, zeroBuffer } from '../Common/crypto_util.js';
 import { verifyChallenge} from './cliFunctions.js';
 
-export { runQuery, logSymmFile, logAsymmFile, getFile, getFileAsymm, updateChallenge, deleteFileSymm, deleteFileAsymm }
+export { runQuery, logSymmFile, logAsymmFile, getFile, getFileAsymm, updateChallenge, deleteFileSymm, deleteFileAsymm, countNumExpired, deleteExpired }
 
 // --------- Crypto files ---------
 
@@ -448,6 +448,49 @@ async function deleteFileSymm(url)
 async function deleteFileAsymm(url)
 {
     await deleteFile(url, "filesAsymm");
+}
+
+/**
+ * Counts the number of entries that expired (ExpireTime < current time). Mainly used to logging and debugging purposes.
+ * @returns {Number} Number of entries that expired
+ * @throws Error if the SQL query errors out
+ */
+async function countNumExpired()
+{
+    try
+    {
+        let resp = await runQuery(
+            `SELECT COUNT() FROM files WHERE ExpireTime < Now()`
+        );
+
+        console.log(resp);
+    }
+    catch(err)
+    {
+        throw `Error when deleting file ${url} from ${table}:  ${err.message || err}`;
+    }
+}
+
+/**
+ * Deletes all the entries that expired (ExpireTime < current time).
+ * @throws Error if the deletion process goes wrong
+ */
+async function deleteExpired()
+{
+    try
+    {
+        await runQuery(
+            `DELETE FROM files WHERE ExpireTime < NOW()`
+        );
+
+        await runQuery(
+            `DELETE FROM filesAsymm WHERE ExpireTime < NOW()`
+        );
+    }
+    catch(err)
+    {
+        throw `Error when deleting file ${url}:  ${err.message || err}`;
+    }
 }
 
 // If we have SIGINT or SIGTERM, gracefully shut down the pool
