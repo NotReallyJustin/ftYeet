@@ -111,4 +111,4 @@ mainServer.listen(80, () => {
 });
 
 // ♻️ Spawn deletion service
-spawn("./deletionServ.js", [], {stdio: 'inherit'});
+spawn("node", ["./deletionServ.js"], {stdio: 'inherit'});

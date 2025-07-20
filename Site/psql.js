@@ -55,11 +55,12 @@ const clientPool = new Pool({
  * @param {String} queryText The query itself. Use `$1`, `$2`, `...` to put add a parameter.
  * @param {Object[]} queryValues Arguments to fill into the parameterized query. Pass this in as an array. I highly doubt that you don't have **any** arguments, but if you don't, pass in an empty array.
  * @param {Boolean|Undefined} arrayRowMode Whether or not to return the query output/result as an array. This is `optional`.
+ * @param {Boolean} noParams Failsafe for dummies. Set this to `true` if you're SURE your `queryText` has no query params.
  * @returns {Promise<Object>} The results from the query
  * @see https://node-postgres.com/features/queries
  * @throw Errors if you don't provide a queryText or queryValue. It will get REALLY mad at you if you don't provide a queryValue.
  */
-async function runQuery(queryText, queryValues, arrayRowMode)
+async function runQuery(queryText, queryValues, arrayRowMode, noParams)
 {
     if (queryText == undefined)
     {
@@ -73,7 +74,7 @@ async function runQuery(queryText, queryValues, arrayRowMode)
         "you straight up failed to provide an array for the `queryValues` parameter. " + 
         "This is opening you up to an SQL injection. Don't do that."
     }
-    else if (queryValues.length == 0)
+    else if (queryValues.length == 0 && (!noParams))
     {
         console.log("Warning when running query: You didn't pass any arguments into `queryValues`. 🤨 I **highly** doubt that you don't have any arguments, so please check this.")
     }
@@ -459,15 +460,22 @@ async function countNumExpired()
 {
     try
     {
-        let resp = await runQuery(
-            `SELECT COUNT() FROM files WHERE ExpireTime < Now()`
+        // Count both in files and filesAsymm
+        let respFilesDB = await runQuery(
+            `SELECT COUNT(*) FROM files WHERE ExpireTime < Now()`,
+            [], false, true
         );
 
-        console.log(resp);
+        let respFilesAsymmDB = await runQuery(
+            `SELECT COUNT(*) FROM filesAsymm WHERE ExpireTime < Now()`,
+            [], false, true
+        );
+
+        return parseInt(respFilesDB.rows[0].count) + parseInt(respFilesAsymmDB.rows[0].count);
     }
     catch(err)
     {
-        throw `Error when deleting file ${url} from ${table}:  ${err.message || err}`;
+        throw `Error when counting number expired:  ${err.message || err}`;
     }
 }
 
@@ -480,16 +488,18 @@ async function deleteExpired()
     try
     {
         await runQuery(
-            `DELETE FROM files WHERE ExpireTime < NOW()`
+            `DELETE FROM files WHERE ExpireTime < NOW()`,
+            [], false, true
         );
 
         await runQuery(
-            `DELETE FROM filesAsymm WHERE ExpireTime < NOW()`
+            `DELETE FROM filesAsymm WHERE ExpireTime < NOW()`,
+            [], false, true
         );
     }
     catch(err)
     {
-        throw `Error when deleting file ${url}:  ${err.message || err}`;
+        throw `Error when deleting expired files:  ${err.message || err}`;
     }
 }
 

@@ -20,7 +20,12 @@ const DISCOVER_INTERVAL_MIN = 1;
  */
 function pruneUploads()
 {
-    
+    deleteExpired()
+        .then(() => {
+            console.log("[Delete Serv] Currently deleting expired uploads.");
+        }).catch(err => {
+            console.error(`[Delete Serv] Error when pruning uploads: ${err.message || err}`);
+        });
 }
 
 /**
@@ -28,9 +33,14 @@ function pruneUploads()
  */
 function discoverUploads()
 {
-    countNumExpired();
+    countNumExpired()
+        .then((numExpired) => {
+            console.log(`[Delete Serv] There's currently ${numExpired} expired uploads.`);
+        }).catch(err => {
+            console.error(`[Delete Serv] Error when counting expired uploads: ${err.message || err}`);
+        });
 }
 
-setInterval(pruneUploads, INTERVAL_MIN * 60000);
-setInterval(discoverUploads, INTERVAL_MIN * 60000);
+setInterval(pruneUploads, DELETE_INTERVAL_MIN * 60000);
+setInterval(discoverUploads, DISCOVER_INTERVAL_MIN * 60000);
 console.log("♻️ Deletion Service is up and ready to go!");
