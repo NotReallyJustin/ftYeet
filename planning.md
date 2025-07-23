@@ -305,4 +305,6 @@ GET: https://api.ftyeet.something/download
 * Lowkey I want to write a script that prevents a user like apache from doing ANYTHING other than serving a website
 
 ## Plan when I open this next time
-* Dynamic adjustment of deletion times
+* Test deletion (actually!)
+* Create permanent HMAC Cryptosys Key
+* Premlock outside of directory

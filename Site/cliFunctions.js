@@ -21,11 +21,6 @@ export { genURL, uploadSymm, checkURL, downloadSymm, uploadAymm, generateChallen
 const HMAC_CRYPTOSYS_KEY = "Temporary";
 // const TEMP_PWD = "Temporary";
 
-/**
- * Path to store the files in
- */
-const FILE_DIR = "./files/";
-
 // 🔑 Asymm Keys
 
 /**
@@ -204,7 +199,7 @@ function downloadSymm(url, pwdHash)
                 }
                 
                 // ⭐ If everything is good, read the file and resolve the output
-                let filePath = path.resolve(FILE_DIR, dbOutput.name);
+                let filePath = path.resolve(process.env.FILE_DIR, dbOutput.name);
                 let fileSyntax;
 
                 try
@@ -370,7 +365,7 @@ function downloadAsymm(url, signedChallenge)
                 }
                 
                 // ⭐ If everything is good, read the file and resolve the output
-                let filePath = path.resolve(FILE_DIR, dbOutput.name);
+                let filePath = path.resolve(process.env.FILE_DIR, dbOutput.name);
                 let fileSyntax;
 
                 try
@@ -466,7 +461,7 @@ function secureWrite(data)
         while (newFilePath == undefined || fileUtil.exists(newFilePath))
         {
             fileName = randomBytes(32).toString('hex');
-            newFilePath = path.resolve(FILE_DIR, fileName);
+            newFilePath = path.resolve(process.env.FILE_DIR, fileName);
         }
 
         // Normally, you would check the dir you're writing to to prevent path traversal, but we alr mitigated that with the re-encoding + docker container

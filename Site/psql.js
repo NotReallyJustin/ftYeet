@@ -482,11 +482,35 @@ async function countNumExpired()
 /**
  * Deletes all the entries that expired (ExpireTime < current time).
  * @throws Error if the deletion process goes wrong
+ * @returns {Promise<String[]>} List of file names to physically delete from CLI Server
  */
 async function deleteExpired()
 {
     try
     {
+        /**
+         * List of file paths that are expired
+         */
+        let expiredFilePaths = [];
+
+        // Count both in files and filesAsymm
+        let respFilesDB = await runQuery(
+            `SELECT * FROM files WHERE ExpireTime < Now()`,
+            [], false, true
+        );
+
+        let respFilesAsymmDB = await runQuery(
+            `SELECT * FROM filesAsymm WHERE ExpireTime < Now()`,
+            [], false, true
+        );
+
+        let respFileDBExpired = respFilesDB.rows.map(row => row.name);
+        let respFileDBAsymmExpired = respFilesAsymmDB.rows.map(row => row.name);
+
+        expiredFilePaths.push(...respFileDBExpired);
+        expiredFilePaths.push(...respFileDBAsymmExpired);
+
+        // Now delete them from DB
         await runQuery(
             `DELETE FROM files WHERE ExpireTime < NOW()`,
             [], false, true
@@ -496,6 +520,9 @@ async function deleteExpired()
             `DELETE FROM filesAsymm WHERE ExpireTime < NOW()`,
             [], false, true
         );
+
+        // After deletion is successful, we can return the expired file paths
+        return expiredFilePaths;
     }
     catch(err)
     {

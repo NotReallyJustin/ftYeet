@@ -4,6 +4,8 @@
 */
 
 import { countNumExpired, deleteExpired } from "./psql.js";
+import { rm } from "fs";
+import * as path from "path";
 
 /**
  * How often we want to delete the expired uploads
@@ -21,8 +23,17 @@ const DISCOVER_INTERVAL_MIN = 1;
 function pruneUploads()
 {
     deleteExpired()
-        .then(() => {
+        .then((expiredFilePaths) => {
             console.log("[Delete Serv] Currently deleting expired uploads.");
+
+            expiredFilePaths.forEach(filePath => {
+                rm(path.resolve(process.env.FILE_DIR, filePath), (err) => {
+                    if (err)
+                    {
+                        console.error(`[Delete Serv] Error when deleting expired file ${filePath}: ${err.message || err}`); 
+                    }
+                });
+            });
         }).catch(err => {
             console.error(`[Delete Serv] Error when pruning uploads: ${err.message || err}`);
         });
@@ -36,6 +47,7 @@ function discoverUploads()
     countNumExpired()
         .then((numExpired) => {
             console.log(`[Delete Serv] There's currently ${numExpired} expired uploads.`);
+
         }).catch(err => {
             console.error(`[Delete Serv] Error when counting expired uploads: ${err.message || err}`);
         });

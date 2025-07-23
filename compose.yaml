@@ -25,6 +25,7 @@ services:
       # FWGROUPNAME: filewrite    # Make sure this matches with build args
       HSMHOST: crypto
       HSMPORT: 6312     # Make sure this matches the expose down below
+      FILE_DIR: "./files/"    # Where the files will be stored serverside
     secrets:
       - cert
       - server_privkey
