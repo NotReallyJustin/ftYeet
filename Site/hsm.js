@@ -7,6 +7,7 @@ import fetch from 'node-fetch';
 import { Agent } from 'https';
 import { binToObject, objectToBin, genPubKeyObject, zeroBuffer } from '../Common/crypto_util.js';
 import { verify } from '../Crypto/cryptoFunc.js';
+import { readFileSync } from 'fs';
 export { hsmDecrypt, hsmEncrypt, hsmSign, hsmVerify }
 
 // --------- HSM Crypto files ---------
