@@ -24,6 +24,9 @@ param (
 
     [Parameter(Mandatory = $true)]
     [string]$CryptoHMACPwd
+
+    [Parameter(Mandatory = $true)]
+    [string]$HMACCryptosysKey
 )
 
 function Abort {
@@ -81,5 +84,6 @@ $CryptoSignKeyPwd | Out-File -FilePath Secrets/cryptoSignKeyPwd.txt -NoNewline
 
 $CryptoSymmPwd | Out-File -FilePath Secrets/cryptoSymmPwd.txt -NoNewline
 $CryptoHMACPwd | Out-File -FilePath Secrets/cryptoHMACPwd.txt -NoNewline
+$HMACCryptosysKey | Out-File -FilePath Secrets/hmacCryptosysKey.txt -NoNewline
 
 echo "Done.";

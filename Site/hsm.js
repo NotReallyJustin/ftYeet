@@ -5,8 +5,30 @@
 
 import fetch from 'node-fetch';
 import { Agent } from 'https';
-import { binToObject, objectToBin } from '../Common/crypto_util.js';
-export { hsmDecrypt, hsmEncrypt, hsmSign }
+import { binToObject, objectToBin, genPubKeyObject, zeroBuffer } from '../Common/crypto_util.js';
+import { verify } from '../Crypto/cryptoFunc.js';
+export { hsmDecrypt, hsmEncrypt, hsmSign, hsmVerify }
+
+// --------- HSM Crypto files ---------
+// These crypto keys correspond to the private keys held by the HSM
+
+/**
+ * (Ideally) ED-25519 public key used to verify digital signatures
+ * @type {Buffer}
+ */
+let cryptoPubkeySign = readFileSync("/run/secrets/crypto_pubkey_sign");
+
+/**
+ * ⭐ Key object for the public (hopefully ED-25519) key.
+ * THIS IS DECRYPTED! YOU CAN VERIFY STUFF WITH THIS!!!
+ * @type {KeyObject}
+ */
+let verifyKeyObj = genPubKeyObject(cryptoPubkeySign, "binary");
+
+// "Garbage collect" - well - as much as the mark-and-sweep algorithm will let us
+zeroBuffer(cryptoPubkeySign);
+
+// ---------------- HSM Specific vars ----------
 
 /**
  * URL of the crypto server (HSM).
@@ -20,6 +42,8 @@ const HSM_URL = `https://${process.env.HSMHOST}:${process.env.HSMPORT}`;
 const IGNORE_SSL_AGENT = new Agent({
     rejectUnauthorized: false
 });
+
+// ----------- Start ----------------
 
 /**
  * Makes a GET request to the HSM tunnel. This function is not intended to be called outside of hsm.js since it can get a bit fucky.
@@ -122,5 +146,24 @@ async function hsmSign(data)
     catch(err)
     {
         throw `Error when signing serverside: ${err.reason || err}`;
+    }
+}
+
+/**
+ * Verifies something signed by the HSM
+ * @param {Buffer} body Text to verify
+ * @param {String} signature Signature to verify (in hex)
+ * @throws Error if verification process goes wrong
+ * @returns {Boolean} Whether or not the signature is valid
+ */
+function hsmVerify(body, signature)
+{
+    try
+    {
+        return verify(body, verifyKeyObj, signature);
+    }
+    catch(err)
+    {
+        throw `Error when verifying HSM Signature: ${err.reason || err}`;
     }
 }

@@ -16,10 +16,9 @@ export { genURL, uploadSymm, checkURL, downloadSymm, uploadAymm, generateChallen
 // ---------------- Load in secrets + server ---------------------------------------------
 
 /**
- * Temporary key used to HMAC the cryptosystem
+ * Private HMAC key used to HMAC the Cryptosystem
  */
-const HMAC_CRYPTOSYS_KEY = "Temporary";
-// const TEMP_PWD = "Temporary";
+const HMAC_CRYPTOSYS_KEY = readFileSync("/run/secrets/hmac_cryptosys_key");
 
 // 🔑 Asymm Keys
 

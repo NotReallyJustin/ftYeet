@@ -34,6 +34,7 @@ openssl req -x509 -newkey rsa:4096 -keyout [privateKeyFilePath] -out [certPath] 
     * If there's a password for the private key file, put it in `cryptoSignKeyPwd.txt`
 * Create `Secrets/cryptoSymmPwd.txt`. This is the password used for symmetric key encryption in the Crypto "HSM."
 * Create `Secrets/cryptoHMACPwd.txt`. This is the password used to generate HMACs in the Crypto "HSM" if that becomes necessary.
+* Create `Secrets/hmacCryptosysKey.txt`. This is the key used to generate serverside HMACs when re-encrypting for the second time
 <br >
 Don't worry, you don't need to remember any of these passwords later down the line. Docker will take care of everything for you.
 <br><br>
@@ -42,15 +43,15 @@ Alternatively, if you don't want to manually create all this, run `genSecrets.ps
 
 ```ps1
 # Add -ExecutionPolicy Bypass if needed
-powershell.exe .\genSecrets.ps1 -PrivKeyPwd "CMC" -DBPwd "TralaleroTralala" -CryptoCertKeyPwd "Scion" -CryptoEncKeyPwd "CharlesChadwick" -CryptoSignKeyPwd "DanteCastello" -CryptoSymmPwd "If_Any_Of_My-DND_Fellas_Are_Lurking_Here_and-Recognize_these_names_Hi!" -CryptoHMACPwd "WeBringTheBoom"
+powershell.exe .\genSecrets.ps1 -PrivKeyPwd "CMC" -DBPwd "TralaleroTralala" -CryptoCertKeyPwd "Scion" -CryptoEncKeyPwd "CharlesChadwick" -CryptoSignKeyPwd "DanteCastello" -CryptoSymmPwd "If_Any_Of_My-DND_Fellas_Are_Lurking_Here_and-Recognize_these_names_Hi!" -CryptoHMACPwd "WeBringTheBoom" -HMACCryptosysKey "LoveIslandSeason7"
 ```
 
 If you're using Linux or WSL, you can run this instead:
 ```bash
-bash ./genSecrets.sh PrivKeyPwd DBPwd DBPrivKeyPwd CryptoCertKeyPwd CryptoEncKeyPwd CryptoSignKeyPwd CryptoSymmPwd CryptoHMACPasswd
+bash ./genSecrets.sh PrivKeyPwd DBPwd DBPrivKeyPwd CryptoCertKeyPwd CryptoEncKeyPwd CryptoSignKeyPwd CryptoSymmPwd CryptoHMACPasswd HmacCryptosysKey
 
 # For example:
-bash ./genSecrets.sh CMC TralaleroTralala Scion CharlesChadwick DanteCastello If_Any_Of_My-DND_Fellas_Are_Lurking_Here_and-Recognize_these_names_Hi! WeBringTheBoom
+bash ./genSecrets.sh CMC TralaleroTralala Scion CharlesChadwick DanteCastello If_Any_Of_My-DND_Fellas_Are_Lurking_Here_and-Recognize_these_names_Hi! WeBringTheBoom LoveIslandSeason7
 ```
 
 If you don't have OpenSSL, install it here: https://www.openssl.org/

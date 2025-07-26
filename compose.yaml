@@ -31,6 +31,7 @@ services:
       - server_privkey
       - server_privkey_pwd
       - db_password
+      - hmac_cryptosys_key
       - crypto_pubkey_sign    # Verify a signature  
       - crypto_pubkey         # Asymmetric encryption
     ports:
@@ -105,3 +106,5 @@ secrets:
     file: ./Secrets/cryptoSymmPwd.txt  # Password to do symmetric enc in crypto server
   crypto_hmac_password:
     file: ./Secrets/cryptoHmacPwd.txt  # Password to HMAC stuff in crypto server
+  hmac_cryptosys_key:
+    file: ./Secrets/hmacCryptosysKey.txt # Password to HMAC the cryptosystem on the serverside for 2nd round of encryption

@@ -12,6 +12,7 @@ CryptoEncKeyPwd=$4;
 CryptoSignKeyPwd=$5;
 CryptoSymmPwd=$6;
 CryptoHMACPwd=$7;
+HmacCryptosysKey=$8;
 
 function abort() {
     echo $1 >&2;
@@ -62,7 +63,8 @@ openssl genpkey -algorithm ed25519 -aes-256-cbc -pass "pass:${CryptoSignKeyPwd}"
 openssl pkey -in ./Secrets/cryptoPrivKeySign.pem -passin "pass:${CryptoSignKeyPwd}" -outform PEM -pubout -out ./Secrets/cryptoPubKeySign.pem;
 echo -n $CryptoSignKeyPwd > ./Secrets/cryptoSignKeyPwd.txt;
 
-echo -n $CryptoSymmPwd > Secrets/cryptoSymmPwd.txt;
-echo -n $CryptoHMACPwd > Secrets/cryptoHMACPwd.txt;
+echo -n $CryptoSymmPwd > ./Secrets/cryptoSymmPwd.txt;
+echo -n $CryptoHMACPwd > ./Secrets/cryptoHMACPwd.txt;
+echo -n $HmacCryptosysKey > ./Secrets/hmacCryptosysKey.txt;
 
 echo "Done.";

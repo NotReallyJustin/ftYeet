@@ -7,30 +7,10 @@ import pg from 'pg';
 import {readFileSync } from 'fs';
 const { Pool } = pg;
 
-import { hsmSign } from './hsm.js';
-import { verify } from '../Crypto/cryptoFunc.js';
-import { genPubKeyObject, zeroBuffer } from '../Common/crypto_util.js';
+import { hsmSign, hsmVerify } from './hsm.js';
 import { verifyChallenge} from './cliFunctions.js';
 
 export { runQuery, logSymmFile, logAsymmFile, getFile, getFileAsymm, updateChallenge, deleteFileSymm, deleteFileAsymm, countNumExpired, deleteExpired }
-
-// --------- Crypto files ---------
-
-/**
- * (Ideally) ED-25519 public key used to verify digital signatures
- * @type {Buffer}
- */
-let cryptoPubkeySign = readFileSync("/run/secrets/crypto_pubkey_sign");
-
-/**
- * ⭐ Key object for the public (hopefully ED-25519) key.
- * THIS IS DECRYPTED! YOU CAN VERIFY STUFF WITH THIS!!!
- * @type {KeyObject}
- */
-let verifyKeyObj = genPubKeyObject(cryptoPubkeySign, "binary");
-
-// "Garbage collect" - well - as much as the mark-and-sweep algorithm will let us
-zeroBuffer(cryptoPubkeySign);
 
 // ---------- Official psql --------------
 
@@ -254,7 +234,7 @@ async function getFile(url)
     
     try
     {
-        if(!verify(hsmMerged, verifyKeyObj, toReturn.checksum))
+        if(!hsmVerify(hsmMerged, toReturn.checksum))
         {
             throw `Checksum/digital signature verification failed.`;
         }
@@ -308,7 +288,7 @@ async function _fetchFileAsymm(url)
 
     try
     {
-        if(!verify(hsmMerged, verifyKeyObj, toReturn.checksum))
+        if(!hsmVerify(hsmMerged, toReturn.checksum))
         {
             throw `Checksum/digital signature verification failed.`;
         }
