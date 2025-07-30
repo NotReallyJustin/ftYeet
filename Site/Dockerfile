@@ -41,7 +41,7 @@ RUN mkdir /usr/src/app/Site/files
 # We will address the issue of execution later by changing file owner to root, changing group to $FWGROUPNAME, and restricting +x perms
 RUN chmod 777 /usr/src/app/Site/files           
 
-# In the future, add apparmor for security hardening. That can happen later tho
+# setfacl access control to restrict permissions for USER node
 
 # Run the application as a non-root user.
 USER node

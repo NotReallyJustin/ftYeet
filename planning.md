@@ -265,15 +265,17 @@ GET: https://api.ftyeet.something/download
 * Public facing - for private user accounts, you'll need to register through CLI (although this would be limited to only people i trust)
 
 ## File System Security
-* Disable execution on all files
 * ~~Potentially containerize/hide stuff in a seperate "virtual file system" to isolate from main file system~~
 * ~~--> not too sure how to do that; but if `Hadoop` fs could pull something like that together so can we~~
 * ^^ Decided against this: If you can upload files, you can download files. If you can download files, you can probably run them.
-* `"You don't get hacked by files. You get hacked by *processes*"` - guy from BSides
-* Track total size
-* `chown` to an account with no login perms
-* We can disable `chmod` and stuff for that app
-* `sudo -u vulnNodeAppUser node /path/to/app/index.js`
+* `$setfacl -d -m u:node:rw` to strip the account of all rwx perms except the ones we explicitly grant it.
+    * Can't `rwx` outside of the CLI server directory
+        * I think this also has the nice side effect of restricting things like `$cd` and `$ls` outside of the CLI Server Directory
+    * Can't `wx` in `/run/secrets`
+    * Can't `x` in the CLI Server directory
+* `$setfacl -d -R` should recursively ban stuff
+    * Although we would only need `-d` flag in the CLI server directory because that's the only directory where `node` will be able to create new folders/files
+    * But if we put more `-ds`, the closest parent's ACL takes precedence
 
 ## Containerization ✅
 * Docker - not because it's trendy but because I really don't want someone to upload and then execute a script that modifies `/etc/shadow` or smth  ✅
