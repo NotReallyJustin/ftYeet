@@ -39,7 +39,7 @@ RUN mkdir /usr/src/app/Site/files
 # x permission for dirs == you can $cd into it
 # +x to a dir doesn't give +x to files inside it, so we good. By default, when a file is created, it doesn't have execute perms for owner.
 # We will address the issue of execution later by changing file owner to root, changing group to $FWGROUPNAME, and restricting +x perms
-RUN chmod 777 /usr/src/app/Site/files           
+RUN chmod 777 /usr/src/app/Site/files 
 
 # setfacl access control to restrict permissions for USER node
 

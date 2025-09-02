@@ -324,3 +324,4 @@ GET: https://api.ftyeet.something/download
 ## Plan when I open this next time
 * Documentation
 * `seccomp` more
+* Prevent user from modifying umask (`pam-umask`)
