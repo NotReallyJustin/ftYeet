@@ -320,8 +320,6 @@ GET: https://api.ftyeet.something/download
         * Node.js' crypto module automatically creates worker threads for us when doing all the heavy cryptography
         * Functions like `genAsymmCryptosystem` or parsing cryptosystem isn't memory intensive; it's basically like us accessing array indices in C. Basically, O(1)
 
-## P
-
 ## Future Plans
 * Prevent bots from abusing file upload (we only have so much space)
 * Stop using self signed certs (certbot for website *if* we can have a domain name --> some self-signed stuff might work temporarily; need to think of how to do it for the FTYeet Protocol)
