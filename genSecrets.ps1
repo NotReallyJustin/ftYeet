@@ -65,25 +65,25 @@ if (!(Test-Path -Path "Secrets"))
 
 # X509
 openssl req -x509 -subj "/C=US/ST=NY/L=NYC/O=ftYeet Inc/CN=ftYeet/" -passout "pass:${PrivKeyPwd}" -sha256 -days 365 -newkey rsa:2048 -keyout Secrets/privKey.pem -out Secrets/cert.pem 
-$PrivKeyPwd | Out-File -FilePath Secrets/privKeyPwd.txt -NoNewline     # Roundabout way of echoing bc Ps1 is dumb
+$PrivKeyPwd | Out-File -FilePath Secrets/privKeyPwd.txt -NoNewline -Encoding utf8    # Roundabout way of echoing bc Ps1 is dumb
 
-$DBPwd | Out-File -FilePath Secrets/dbPassword.txt -NoNewline
+$DBPwd | Out-File -FilePath Secrets/dbPassword.txt -NoNewline -Encoding utf8
 
 openssl req -x509 -subj "/C=US/ST=NY/L=NYC/O=ftYeet Inc/CN=ftYeet/" -nodes -sha256 -days 365 -newkey rsa:2048 -keyout Secrets/dbPrivKey.pem -out Secrets/dbCert.pem 
-$DBPrivKeyPwd | Out-File -FilePath Secrets/dbPrivKeyPwd.txt -NoNewline
+$DBPrivKeyPwd | Out-File -FilePath Secrets/dbPrivKeyPwd.txt -NoNewline -Encoding utf8
 
 openssl req -x509 -subj "/C=US/ST=NY/L=NYC/O=ftYeet Inc/CN=ftYeet/" -passout "pass:${CryptoCertKeyPwd}" -sha256 -days 365 -newkey rsa:2048 -keyout Secrets/cryptoHTTPKey.pem -out Secrets/cryptoCert.pem 
-$CryptoCertKeyPwd | Out-File -FilePath Secrets/cryptoCertKeyPwd.txt -NoNewline
+$CryptoCertKeyPwd | Out-File -FilePath Secrets/cryptoCertKeyPwd.txt -NoNewline -Encoding utf8
 
 # openssl has been really finnicky on Windows when I try to automate anything that's not a X509 cert. So what we're going to do is to just use our Node script to generate the keys
 node CLI/main.js keygen -a rsa -v Secrets/cryptoPrivKey.pem -u Secrets/cryptoPubKey.pem -o CryptoEncKeyPwd -k aes-256-cbc
-$CryptoEncKeyPwd | Out-File -FilePath Secrets/cryptoEncKeyPwd.txt -NoNewline
+$CryptoEncKeyPwd | Out-File -FilePath Secrets/cryptoEncKeyPwd.txt -NoNewline -Encoding utf8
 
 node CLI/main.js keygen -a ed25519 -v Secrets/cryptoPrivKeySign.pem -u Secrets/cryptoPubKeySign.pem -o CryptoSignKeyPwd -k aes-256-cbc
-$CryptoSignKeyPwd | Out-File -FilePath Secrets/cryptoSignKeyPwd.txt -NoNewline
+$CryptoSignKeyPwd | Out-File -FilePath Secrets/cryptoSignKeyPwd.txt -NoNewline -Encoding utf8
 
-$CryptoSymmPwd | Out-File -FilePath Secrets/cryptoSymmPwd.txt -NoNewline
-$CryptoHMACPwd | Out-File -FilePath Secrets/cryptoHMACPwd.txt -NoNewline
-$HMACCryptosysKey | Out-File -FilePath Secrets/hmacCryptosysKey.txt -NoNewline
+$CryptoSymmPwd | Out-File -FilePath Secrets/cryptoSymmPwd.txt -NoNewline -Encoding utf8
+$CryptoHMACPwd | Out-File -FilePath Secrets/cryptoHMACPwd.txt -NoNewline -Encoding utf8
+$HMACCryptosysKey | Out-File -FilePath Secrets/hmacCryptosysKey.txt -NoNewline -Encoding utf8
 
 echo "Done.";

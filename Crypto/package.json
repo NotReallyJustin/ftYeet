@@ -10,6 +10,7 @@
   "keywords": [
     "Crypto"
   ],
+  "type": "module",
   "author": "blud",
   "license": "GPL-3.0-or-later",
   "dependencies": {

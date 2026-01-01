@@ -331,6 +331,7 @@ GET: https://api.ftyeet.something/download
 * ~~Instead of buffer.from(), consider V8 serialization~~
     * Don't do this. We can't guarentee what we're sanitizing will be secure.
     * Use Buffer.from() instead - it's much more straightforward and natural + we don't need to deal with RCE or smth
+* Have a server config file instead of hardcoding maybe; but that could also be in Docker compose ngl
 
 ## Next project idea
 * Lowkey I want to write a script that prevents a user like apache from doing ANYTHING other than serving a website
