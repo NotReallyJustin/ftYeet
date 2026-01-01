@@ -293,15 +293,31 @@ GET: https://api.ftyeet.something/download
 ## Miscellaneous
 * Crypto Server might not need all the encryption files (ie. public keys) since it has no use for any of them
 
+## UX and Progress Bar
+* Assign Job ID to each entry
+* Update queue status in the SQL DB
+    * SQL database read/writes are decently fast when you narrow it down
+    * But if this becomes a huge problem in the future we can use an in-memory data structure or just something like Redis
+* The CLI periodically calls /status with the job ID and gets the status
+    * Use this to display progress bar
+    * You can't really make cryptography go faster, but you could make UX better for the user by telling them the status of their upload/download
+        * We kind of intentionally used bcrypt
+        * Node.js' crypto module automatically creates worker threads for us when doing all the heavy cryptography
+        * Functions like `genAsymmCryptosystem` or parsing cryptosystem isn't memory intensive; it's basically like us accessing array indices in C. Basically, O(1)
+
+## P
+
 ## Future Plans
 * Prevent bots from abusing file upload (we only have so much space)
-* Get TLS (certbot for website *if* we can have a domain name --> some self-signed stuff might work temporarily; need to think of how to do it for the FTYeet Protocol)
+* Stop using self signed certs (certbot for website *if* we can have a domain name --> some self-signed stuff might work temporarily; need to think of how to do it for the FTYeet Protocol)
 * Private key rotation daemon on server
 * 🚨 Lowkey thinking of just flat out not giving users permission to upload a file without a password because c'mon dude at that point why even bother 
 * 2FA? Lowkey this is probably overkill
 * Buy ftyeet domain. As of now, this DNS is getting resolved locally which is not rly a good thing lmao
 * Maybe symmetric enc's cryptosystem should tell us the encryption alg
-* Instead of buffer.from(), consider V8 serialization
+* ~~Instead of buffer.from(), consider V8 serialization~~
+    * Don't do this. We can't guarentee what we're sanitizing will be secure.
+    * Use Buffer.from() instead - it's much more straightforward and natural + we don't need to deal with RCE or smth
 
 ## Next project idea
 * Lowkey I want to write a script that prevents a user like apache from doing ANYTHING other than serving a website
