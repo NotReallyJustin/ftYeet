@@ -264,9 +264,9 @@ GET: https://api.ftyeet.something/download
 * If it's a public/private key thing, tell them that private/public key encryption isn't currently supported
 * Public facing - for private user accounts, you'll need to register through CLI (although this would be limited to only people i trust)
 
-## File System Security
-* ~~Potentially containerize/hide stuff in a seperate "virtual file system" to isolate from main file system~~
-* ~~--> not too sure how to do that; but if `Hadoop` fs could pull something like that together so can we~~
+## File System Security [ ARCHIVED/DEPRECATED ]
+* Potentially containerize/hide stuff in a seperate "virtual file system" to isolate from main file system
+* --> not too sure how to do that; but if `Hadoop` fs could pull something like that together so can we
 * ^^ Decided against this: If you can upload files, you can download files. If you can download files, you can probably run them.
 * `$setfacl -d -m u:node:rw` to strip the account of all rwx perms except the ones we explicitly grant it.
     * Can't `rwx` outside of the CLI server directory
@@ -275,7 +275,22 @@ GET: https://api.ftyeet.something/download
     * Can't `x` in the CLI Server directory
 * `$setfacl -d -R` should recursively ban stuff
     * Although we would only need `-d` flag in the CLI server directory because that's the only directory where `node` will be able to create new folders/files
-    * But if we put more `-ds`, the closest parent's ACL takes precedence
+    * `-d` doesn't work with `-R` though
+    * But if we put more `-d`, the closest parent's ACL takes precedence
+    * use --- explicitly instead of -x
+
+## File System Security - NEW
+* Decided against `setfacl` - this breaks `npm`, and because we use Alpine Linux (which runs on BusyBox), trying to access control via `setfacl` on things like `chmod` will break the entire OS
+    * In Alpine, all /bin/ commands like `/bin/chmod` are links to `busybox`
+    * `setfacl` doesn't stop the attacker from calling an interpreter like `python` or `node` on a user-uploaded file w/o `x` perms
+    * Also `acl` doesn't come in Alpine Linux
+* We can't modify `$chmod` since the attacker could just compile a C program and make the syscall, or just do it in Node.js (since V8 uses C)
+* Instead, we're going to:
+    * Implement `umask 022` - this is default on Alpine but we're putting it Dockerfile
+        * This means unless someone explicitly `$chmod`s, new files do NOT have `x` perms
+    * Prevent `chmod` syscalls via `seccomp`
+        * Put it in docker `compose.yaml`
+        * Also do it for `chmod` related syscalls like `fchmod` - probably a list in my CS492 notes
 
 ## Containerization ✅
 * Docker - not because it's trendy but because I really don't want someone to upload and then execute a script that modifies `/etc/shadow` or smth  ✅
@@ -323,4 +338,6 @@ GET: https://api.ftyeet.something/download
 * Lowkey I want to write a script that prevents a user like apache from doing ANYTHING other than serving a website
 
 ## Plan when I open this next time
-* Premlock outside of directory
+* Documentation
+* `seccomp` more
+* Prevent user from modifying umask (`pam-umask`)
