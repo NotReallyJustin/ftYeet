@@ -1001,6 +1001,7 @@ const genPrivKeyObject = (privateKey, password, inBinary) => {
         }
         catch(err)
         {
+            console.error(err)
             continue;
         }
     }

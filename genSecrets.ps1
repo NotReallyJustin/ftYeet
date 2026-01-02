@@ -40,6 +40,9 @@ function Abort {
     exit 1;
 }
 
+# From Stack Overflow - this is how you get around PS5 writing with a BOM (file header bytes indicating this is in UTF-8; breaks a lot of stuff)
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+
 # Force the user to run this executable in the root ftYeet directory
 if (!((Test-Path -Path ".gitignore") -or (Test-Path -Path "compose.yaml")))
 {
@@ -65,25 +68,24 @@ if (!(Test-Path -Path "Secrets"))
 
 # X509
 openssl req -x509 -subj "/C=US/ST=NY/L=NYC/O=ftYeet Inc/CN=ftYeet/" -passout "pass:${PrivKeyPwd}" -sha256 -days 365 -newkey rsa:2048 -keyout Secrets/privKey.pem -out Secrets/cert.pem 
-$PrivKeyPwd | Out-File -FilePath Secrets/privKeyPwd.txt -NoNewline -Encoding utf8    # Roundabout way of echoing bc Ps1 is dumb
+[System.IO.File]::AppendAllText("Secrets/privKeyPwd.txt", $PrivKeyPwd, $utf8NoBom)
 
-$DBPwd | Out-File -FilePath Secrets/dbPassword.txt -NoNewline -Encoding utf8
+[System.IO.File]::AppendAllText("Secrets/dbPassword.txt", $DBPwd, $utf8NoBom)
 
 openssl req -x509 -subj "/C=US/ST=NY/L=NYC/O=ftYeet Inc/CN=ftYeet/" -nodes -sha256 -days 365 -newkey rsa:2048 -keyout Secrets/dbPrivKey.pem -out Secrets/dbCert.pem 
-$DBPrivKeyPwd | Out-File -FilePath Secrets/dbPrivKeyPwd.txt -NoNewline -Encoding utf8
 
 openssl req -x509 -subj "/C=US/ST=NY/L=NYC/O=ftYeet Inc/CN=ftYeet/" -passout "pass:${CryptoCertKeyPwd}" -sha256 -days 365 -newkey rsa:2048 -keyout Secrets/cryptoHTTPKey.pem -out Secrets/cryptoCert.pem 
-$CryptoCertKeyPwd | Out-File -FilePath Secrets/cryptoCertKeyPwd.txt -NoNewline -Encoding utf8
+[System.IO.File]::AppendAllText("Secrets/cryptoCertKeyPwd.txt", $CryptoCertKeyPwd, $utf8NoBom)
 
 # openssl has been really finnicky on Windows when I try to automate anything that's not a X509 cert. So what we're going to do is to just use our Node script to generate the keys
 node CLI/main.js keygen -a rsa -v Secrets/cryptoPrivKey.pem -u Secrets/cryptoPubKey.pem -o CryptoEncKeyPwd -k aes-256-cbc
-$CryptoEncKeyPwd | Out-File -FilePath Secrets/cryptoEncKeyPwd.txt -NoNewline -Encoding utf8
+[System.IO.File]::AppendAllText("Secrets/cryptoEncKeyPwd.txt", $CryptoEncKeyPwd, $utf8NoBom)
 
 node CLI/main.js keygen -a ed25519 -v Secrets/cryptoPrivKeySign.pem -u Secrets/cryptoPubKeySign.pem -o CryptoSignKeyPwd -k aes-256-cbc
-$CryptoSignKeyPwd | Out-File -FilePath Secrets/cryptoSignKeyPwd.txt -NoNewline -Encoding utf8
+[System.IO.File]::AppendAllText("Secrets/cryptoSignKeyPwd.txt", $CryptoSignKeyPwd, $utf8NoBom)
 
-$CryptoSymmPwd | Out-File -FilePath Secrets/cryptoSymmPwd.txt -NoNewline -Encoding utf8
-$CryptoHMACPwd | Out-File -FilePath Secrets/cryptoHMACPwd.txt -NoNewline -Encoding utf8
-$HMACCryptosysKey | Out-File -FilePath Secrets/hmacCryptosysKey.txt -NoNewline -Encoding utf8
+[System.IO.File]::AppendAllText("Secrets/cryptoSymmPwd.txt", $CryptoSymmPwd, $utf8NoBom)
+[System.IO.File]::AppendAllText("Secrets/cryptoHMACPwd.txt", $CryptoHMACPwd, $utf8NoBom)
+[System.IO.File]::AppendAllText("Secrets/hmacCryptosysKey.txt", $HMACCryptosysKey, $utf8NoBom)
 
 echo "Done.";

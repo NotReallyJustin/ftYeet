@@ -48,10 +48,10 @@ powershell.exe .\genSecrets.ps1 -PrivKeyPwd "CMC" -DBPwd "TralaleroTralala" -Cry
 
 If you're using Linux or WSL, you can run this instead:
 ```bash
-bash ./genSecrets.sh PrivKeyPwd DBPwd DBPrivKeyPwd CryptoCertKeyPwd CryptoEncKeyPwd CryptoSignKeyPwd CryptoSymmPwd CryptoHMACPasswd HmacCryptosysKey
+bash ./genSecrets.sh PrivKeyPwd DBPwd CryptoCertKeyPwd CryptoEncKeyPwd CryptoSignKeyPwd CryptoSymmPwd CryptoHMACPasswd HmacCryptosysKey
 
 # For example:
-bash ./genSecrets.sh CMC TralaleroTralala Scion CharlesChadwick DanteCastello If_Any_Of_My-DND_Fellas_Are_Lurking_Here_and-Recognize_these_names_Hi! WeBringTheBoom LoveIslandSeason7
+bash ./genSecrets.sh CMC TralaleroTralala CharlesChadwick DanteCastello If_Any_Of_My-DND_Fellas_Are_Lurking_Here_and-Recognize_these_names_Hi! WeBringTheBoom LoveIslandSeason7
 ```
 
 If you don't have OpenSSL, install it here: https://www.openssl.org/

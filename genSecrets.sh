@@ -2,7 +2,7 @@
 # This is genSecrets.ps1, but it's a bash script for the Linux and WSL people
 
 # Granted bash doesn't hold your hand when it comes to params, so this does require you to slightly know what you're doing
-# Usage: ./genSecrets.sh <PrivKeyPwd> <DBPwd> <DBPrivKeyPwd> <CryptoCertKeyPwd> <CryptoEncKeyPwd> <CryptoSignKeyPwd> <CryptoSymmPwd> <CryptoHMACPwd>
+# Usage: ./genSecrets.sh <PrivKeyPwd> <DBPwd> <CryptoCertKeyPwd> <CryptoEncKeyPwd> <CryptoSignKeyPwd> <CryptoSymmPwd> <CryptoHMACPwd> <HmacCryptosysKey>
 
 # I know bash wants these in uppercase but I'm making things portable so we're just gonna ignore the convention stuff
 PrivKeyPwd=$1;
@@ -21,7 +21,7 @@ function abort() {
 
 # Error check on params
 if [[ $# -ne 7 ]]; then
-    abort "Usage: $0 <PrivKeyPwd> <DBPwd> <DBPrivKeyPwd> <CryptoCertKeyPwd> <CryptoEncKeyPwd> <CryptoSignKeyPwd> <CryptoSymmPwd>";
+    abort "Usage: $0 <PrivKeyPwd> <DBPwd> <CryptoCertKeyPwd> <CryptoEncKeyPwd> <CryptoSignKeyPwd> <CryptoSymmPwd> <HmacCryptosysKey>";
 fi;
 
 # Force the user to run this executable in the root ftYeet directory
@@ -48,7 +48,6 @@ echo -n $DBPwd > ./Secrets/dbPassword.txt;
 # Private key will stay private; plus this is only for SSL connections to the database
 # postgres cannot decrypt private keys
 openssl req -x509 -subj "/C=US/ST=NY/L=NYC/O=ftYeet Inc/CN=ftYeet/" -nodes -sha256 -days 365 -newkey rsa:2048 -keyout Secrets/dbPrivKey.pem -out Secrets/dbCert.pem;
-echo -n $DBPrivKeyPwd > ./Secrets/dbPrivKeyPwd.txt;
 
 openssl req -x509 -subj "/C=US/ST=NY/L=NYC/O=ftYeet Inc/CN=ftYeet/" -passout "pass:${CryptoCertKeyPwd}" -sha256 -days 365 -newkey rsa:2048 -keyout Secrets/cryptoHTTPKey.pem -out Secrets/cryptoCert.pem;
 echo -n $CryptoCertKeyPwd > ./Secrets/cryptoCertKeyPwd.txt;
