@@ -87,18 +87,18 @@ async function runQuery(queryText, queryValues, arrayRowMode, noParams)
 
 /**
  * Logs a file encrypted symmetrically in the postgres database.
- * @param {String} fileName The name of the file as stored on our end. This should be unique and randomly generated (hopefully)
  * @param {String} pwdHash2 The hash of the password hash provided by the user.
  * @param {boolean} burnOnRead Whether this file should be burnt when we download it
  * @param {Date} expireTimestamp Timestamp when the file expires (and gets marked for deletion)
  * @param {String} url URL you can access the file from
+ * @returns {String} UUID of the logged file. This will be used as the file name.
  * @throws If any of the inputs are invalid
  */
-async function logSymmFile(fileName, pwdHash2, burnOnRead, expireTimestamp, url)
+async function logSymmFile(pwdHash2, burnOnRead, expireTimestamp, url)
 {
-    let hsmMerged = `${fileName} ${pwdHash2} ${burnOnRead} ${expireTimestamp} ${url}`;
+    let hsmMerged = `${pwdHash2} ${burnOnRead} ${expireTimestamp} ${url}`;
 
-    if (fileName == undefined || pwdHash2 == undefined || burnOnRead == undefined || expireTimestamp == undefined || url == undefined)
+    if (pwdHash2 == undefined || burnOnRead == undefined || expireTimestamp == undefined || url == undefined)
     {
         throw "Error when logging file in database: There's something in the input that is undefined.";
     }
@@ -122,10 +122,12 @@ async function logSymmFile(fileName, pwdHash2, burnOnRead, expireTimestamp, url)
     // Upload to DB
     try
     {
-        await runQuery(
-            "INSERT INTO files(Name, PwdHashHash, BurnOnRead, ExpireTime, Url, CheckSum) VALUES($1, $2, $3, $4, $5, $6)",
-            [fileName, pwdHash2, burnOnRead, expireTimestamp, url, checksum], false
+        let jsonRet = await runQuery(
+            "INSERT INTO files(PwdHashHash, BurnOnRead, ExpireTime, Url, CheckSum) VALUES($1, $2, $3, $4, $5) RETURNING UUID",
+            [pwdHash2, burnOnRead, expireTimestamp, url, checksum], false
         );
+
+        return jsonRet.UUID;
     }
     catch(err)
     {
@@ -135,14 +137,14 @@ async function logSymmFile(fileName, pwdHash2, burnOnRead, expireTimestamp, url)
 
 /**
  * Logs an asymmetrically encrypted file in the postgres database.
- * @param {String} fileName The name of the file as stored on our end. This should be unique and randomly generated (hopefully)
  * @param {String} pubkeyB64 The public key, in base64.
  * @param {boolean} burnOnRead Whether this file should be burnt when we download it
  * @param {Date} expireTimestamp Timestamp when the file expires (and gets marked for deletion)
  * @param {String} url URL you can access the file from
+ * @returns {String} UUID of the logged file. This will be used as the file name.
  * @throws If any of the inputs are invalid
  */
-async function logAsymmFile(fileName, pubkeyB64, burnOnRead, expireTimestamp, url)
+async function logAsymmFile(pubkeyB64, burnOnRead, expireTimestamp, url)
 {
     // We don't immediately create a challenge when the user does asymm file upload
     // We wait for auth()
@@ -150,9 +152,9 @@ async function logAsymmFile(fileName, pubkeyB64, burnOnRead, expireTimestamp, ur
     let challenge = "null";
     let challengeExpireTime = new Date(Date.now());
 
-    let hsmMerged = `${fileName} ${pubkeyB64} ${burnOnRead} ${expireTimestamp} ${url} ${challenge} ${challengeExpireTime}`;
+    let hsmMerged = `${pubkeyB64} ${burnOnRead} ${expireTimestamp} ${url} ${challenge} ${challengeExpireTime}`;
 
-    if (fileName == undefined || pubkeyB64 == undefined || burnOnRead == undefined || expireTimestamp == undefined || url == undefined)
+    if (pubkeyB64 == undefined || burnOnRead == undefined || expireTimestamp == undefined || url == undefined)
     {
         throw "Error when logging file in database: There's something in the input that is undefined.";
     }
@@ -181,10 +183,12 @@ async function logAsymmFile(fileName, pubkeyB64, burnOnRead, expireTimestamp, ur
     // Upload to DB
     try
     {
-        await runQuery(
-            "INSERT INTO filesAsymm(Name, PubKeyB64, BurnOnRead, ExpireTime, Url, Challenge, ChallengeTime, CheckSum) VALUES($1, $2, $3, $4, $5, $6, $7, $8)",
-            [fileName, pubkeyB64, burnOnRead, expireTimestamp, url, challenge, challengeExpireTime, checksum], false
+        let jsonRet = await runQuery(
+            "INSERT INTO filesAsymm(PubKeyB64, BurnOnRead, ExpireTime, Url, Challenge, ChallengeTime, CheckSum) VALUES($1, $2, $3, $4, $5, $6, $7) RETURNING UUID",
+            [pubkeyB64, burnOnRead, expireTimestamp, url, challenge, challengeExpireTime, checksum], false
         );
+
+        return jsonRet.UUID;
     }
     catch(err)
     {

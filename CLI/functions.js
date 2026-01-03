@@ -661,6 +661,7 @@ function downloadAsymm(dirPath, url, verifyKeyPath, decKeyPath, decKeyPwd)
                             try
                             {
                                 fileUtil.writeFileUnique(filePath, unFileConstruct.fileContent);
+                                console.log(`Successfully downloaded file with URL ${url}.`);
                             }
                             catch(err)
                             {
