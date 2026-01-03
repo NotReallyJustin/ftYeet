@@ -63,6 +63,9 @@ services:
     build:
       context: ./
       dockerfile: ./Crypto/Dockerfile
+    security_opt:
+      - "seccomp:seccomp.json"   # This prevents node from changing ANY permissions. Runs AFTER dockerfile
+      - "no-new-privileges:true"
     environment:
       PORT: 6312
     secrets:

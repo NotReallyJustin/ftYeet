@@ -1,5 +1,6 @@
 import * as https from 'https';
 import { writeFile, chmod, readFileSync, rmSync } from 'fs';
+import { deflate, inflate} from 'node:zlib';
 import * as cryptoUtil from '../Common/crypto_util.js';
 import * as path from 'path';
 import * as fileUtil from '../Common/file_util.js';
@@ -112,52 +113,58 @@ function uploadSymm(data, expireTime, burnOnRead, pwdHash, url)
 {
     return new Promise((resolve, reject) => {
         
-        // Encrypt the data again (by converting it to - you guessed it - another file syntax!). In the future, this is gonna get moved
-        hsmEncrypt(data).then(symmEnc => {
-            let ciphertext = symmEnc.ciphertext;
-            delete symmEnc.ciphertext;
-            
-            let encryptedData = cryptoUtil.toFileSyntaxSymm(symmEnc, ciphertext, cryptoUtil.secureKeyGen(HMAC_CRYPTOSYS_KEY, 32, symmEnc.hmacSalt), 'Server');
+        deflate(data, (err, deflatedData) => {
 
-            secureWrite(encryptedData)
-                .then((pathObjects) => {
-                    // Hash pwds again and then store it
-                    let pwdHash2 = cryptoUtil.genPwdHash(pwdHash, 32);
+            if (err)
+            {
+                reject("File failed to compress. Please check to make sure that your file isn't corrupted.");
+            }
 
-                    // Write to database
-                    let expireTimestamp = new Date(Date.now() + expireTime * 1000);
+            // Encrypt the data again (by converting it to - you guessed it - another file syntax!). In the future, this is gonna get moved
+            hsmEncrypt(deflatedData).then(symmEnc => {
+                let ciphertext = symmEnc.ciphertext;
+                delete symmEnc.ciphertext;
+                
+                let encryptedData = cryptoUtil.toFileSyntaxSymm(symmEnc, ciphertext, cryptoUtil.secureKeyGen(HMAC_CRYPTOSYS_KEY, 32, symmEnc.hmacSalt), 'Server');
 
-                    logSymmFile(
-                        pathObjects.fileName, pwdHash2, burnOnRead, expireTimestamp, url
-                    ).then(() => {
+                secureWrite(encryptedData)
+                    .then((pathObjects) => {
+                        // Hash pwds again and then store it
+                        let pwdHash2 = cryptoUtil.genPwdHash(pwdHash, 32);
 
-                        // Auto delete process start       
+                        // Write to database
+                        let expireTimestamp = new Date(Date.now() + expireTime * 1000);
 
-                        console.log(`Data written to ${pathObjects.newFilePath}`);
-                        resolve();
+                        logSymmFile(
+                            pathObjects.fileName, pwdHash2, burnOnRead, expireTimestamp, url
+                        ).then(() => {
 
-                    }).catch((err) => {
+                            console.log(`Data written to ${pathObjects.newFilePath}`);
+                            resolve();
 
-                        // If writing fails, delete the file
-                        try
-                        {
-                            rmSync(pathObjects, {force: true});
-                        }
-                        catch(err)
-                        {
-                            console.error(`Failed to remove file ${pathObjects} when logging fails: ${err}.`)
-                        }
-                        
-                        console.error(`Error in uploadSymm when running SQL: ${err}`);
-                        reject("Internal Database Error. Ask the owner of ftYeet to check their logs.");
+                        }).catch((err) => {
+
+                            // If writing fails, delete the file
+                            try
+                            {
+                                rmSync(pathObjects, {force: true});
+                            }
+                            catch(err)
+                            {
+                                console.error(`Failed to remove file ${pathObjects} when logging fails: ${err}.`)
+                            }
+                            
+                            console.error(`Error in uploadSymm when running SQL: ${err}`);
+                            reject("Internal Database Error. Ask the owner of ftYeet to check their Docker logs.");
+                        });
+                    }).catch(err => {
+                        console.error(`Error in uploadSymm: ${err}`);
+                        reject(err);
                     });
-                }).catch(err => {
-                    console.error(`Error in uploadSymm: ${err}`);
-                    reject(err);
-                });
-        }).catch(err => {
-            console.error(`Error in uploadSymm when making HSM request: ${err}`);
-            reject(err);
+            }).catch(err => {
+                console.error(`Error in uploadSymm when making HSM request: ${err}`);
+                reject(err);
+            });
         });
     });
 }
@@ -233,8 +240,21 @@ function downloadSymm(url, pwdHash)
 
                 // This will still be in file syntax. We ran it twice.
                 hsmDecrypt(restored_hsm_fmt)
-                    .then(decrypted => {
-                        resolve(decrypted);
+                    .then(deflatedData => {
+
+                        // Reinflate data
+                        inflate(deflatedData, (err, data) => {
+
+                            if (err)
+                            {
+                                reject("File failed to inflate. Make sure your file isn't corrupted.");
+                            }
+                            else
+                            {
+                                resolve(data);
+                            }
+                        });
+
                     }).catch(err => {
                         console.error(`Error when decrypting file syntax: ${err}`);
                         reject(`Unable to retrieve file from ftyeet. ${err}`);
@@ -242,7 +262,7 @@ function downloadSymm(url, pwdHash)
 
             }).catch(err => {
                 console.error(`Error in downloadSymm when running SQL: ${err}`);
-                reject("Internal Database Error. Ask the owner of ftYeet to check their logs.");
+                reject("Internal Database Error. Ask the owner of ftYeet to check their Docker logs.");
             });
     });
 }
@@ -259,58 +279,65 @@ function downloadSymm(url, pwdHash)
  */
 function uploadAymm(data, expireTime, burnOnRead, pubkeyB64, url)
 {
-return new Promise((resolve, reject) => {
+    return new Promise((resolve, reject) => {
         
-        // Encrypt the data again (by converting it to - you guessed it - another file syntax!).
-        // This is just like what we did with the symmetric file uploads
-        hsmEncrypt(data).then(symmEnc => {
-            let ciphertext = symmEnc.ciphertext;
-            delete symmEnc.ciphertext;
-            
-            // No need to use asymm file syntax here. If we did use asymm file syntax, the would-be private key would be stored in the
-            // same place as the symmetric key right now. They're equally secure, but file syntax symm is just faster.
-            let encryptedData = cryptoUtil.toFileSyntaxSymm(symmEnc, ciphertext, cryptoUtil.secureKeyGen(HMAC_CRYPTOSYS_KEY, 32, symmEnc.hmacSalt), 'Server');
+        // Deflate data. It's really quick and saves space.
+        deflate(data, (err, deflatedData) => {
 
-            secureWrite(encryptedData)
-                .then((pathObjects) => {
-                   
-                    // Before we start, note that we're storing the base64 public key in postgres. The fact that it's base64 makes things A LOT easier for us.
-                    // Also it's a public key. We don't need to protect it.
+            if (err)
+            {
+                reject("File failed to compress. Please check to make sure that your file isn't corrupted.");
+            }
 
-                    // Write timestamp to database
-                    let expireTimestamp = new Date(Date.now() + expireTime * 1000);
+            // Encrypt the data again (by converting it to - you guessed it - another file syntax!).
+            // This is just like what we did with the symmetric file uploads
+            hsmEncrypt(deflatedData).then(symmEnc => {
+                let ciphertext = symmEnc.ciphertext;
+                delete symmEnc.ciphertext;
+                
+                // No need to use asymm file syntax here. If we did use asymm file syntax, the would-be private key would be stored in the
+                // same place as the symmetric key right now. They're equally secure, but file syntax symm is just faster.
+                let encryptedData = cryptoUtil.toFileSyntaxSymm(symmEnc, ciphertext, cryptoUtil.secureKeyGen(HMAC_CRYPTOSYS_KEY, 32, symmEnc.hmacSalt), 'Server');
 
-                    logAsymmFile(
-                        pathObjects.fileName, pubkeyB64, burnOnRead, expireTimestamp, url
-                    ).then(() => {
+                secureWrite(encryptedData)
+                    .then((pathObjects) => {
+                    
+                        // Before we start, note that we're storing the base64 public key in postgres. The fact that it's base64 makes things A LOT easier for us.
+                        // Also it's a public key. We don't need to protect it.
 
-                        // Auto delete process start       
+                        // Write timestamp to database
+                        let expireTimestamp = new Date(Date.now() + expireTime * 1000);
 
-                        console.log(`Data written to ${pathObjects.newFilePath}`);
-                        resolve();
+                        logAsymmFile(
+                            pathObjects.fileName, pubkeyB64, burnOnRead, expireTimestamp, url
+                        ).then(() => {    
 
-                    }).catch((err) => {
+                            console.log(`Data written to ${pathObjects.newFilePath}`);
+                            resolve();
 
-                        // If writing fails, delete the file
-                        try
-                        {
-                            rmSync(pathObjects, {force: true});
-                        }
-                        catch(err)
-                        {
-                            console.error(`Failed to remove file ${pathObjects} when logging fails: ${err}.`)
-                        }
+                        }).catch((err) => {
 
-                        console.error(`Error in uploadAsymm when running SQL: ${err}`);
-                        reject("Internal Database Error. Ask the owner of ftYeet to check their logs.");
+                            // If writing fails, delete the file
+                            try
+                            {
+                                rmSync(pathObjects, {force: true});
+                            }
+                            catch(err)
+                            {
+                                console.error(`Failed to remove file ${pathObjects} when logging fails: ${err}.`)
+                            }
+
+                            console.error(`Error in uploadAsymm when running SQL: ${err}`);
+                            reject("Internal Database Error. Ask the owner of ftYeet to check their Docker logs.");
+                        });
+                    }).catch(err => {
+                        console.error(`Error in uploadAsymm: ${err}`);
+                        reject(err);
                     });
-                }).catch(err => {
-                    console.error(`Error in uploadAsymm: ${err}`);
-                    reject(err);
-                });
-        }).catch(err => {
-            console.error(`Error in uploadAsymm when making HSM request: ${err}`);
-            reject(err);
+            }).catch(err => {
+                console.error(`Error in uploadAsymm when making HSM request: ${err}`);
+                reject(err);
+            });
         });
     });
 }
@@ -399,8 +426,21 @@ function downloadAsymm(url, signedChallenge)
 
                 // Decrypt HSM to get user's E2EE file
                 hsmDecrypt(restored_hsm_fmt)
-                    .then(decrypted => {
-                        resolve(decrypted);
+                    .then(deflatedData => {
+                        
+                        inflate(deflatedData, (err, data) => {
+
+                            if (err)
+                            {
+                                reject("File failed to inflate. Make sure your file isn't corrupted.");
+                            }
+                            else
+                            {
+                                resolve(data);
+                            }
+
+                        });
+
                     }).catch(err => {
                         console.error(`Error when decrypting file syntax: ${err}`);
                         reject(`Unable to retrieve file from ftyeet. ${err}`);
@@ -408,7 +448,7 @@ function downloadAsymm(url, signedChallenge)
 
             }).catch(err => {
                 console.error(`Error in downloadAsymm when running SQL: ${err}`);
-                reject("Internal Database Error. Ask the owner of ftYeet to check their logs.");
+                reject("Internal Database Error. Ask the owner of ftYeet to check their Docker logs.");
             });
     });
 }
@@ -473,18 +513,7 @@ function secureWrite(data)
             }
             else
             {
-                // For security, disable execution perms
-                let status = fileUtil.chmod(newFilePath, 0o666);
-                // status = status && fileUtil.chown(newFilePath, ROOT_ID, parseInt(process.env.FWGROUPID));
-
-                if (status)
-                {
-                    resolve({newFilePath: newFilePath, fileName: fileName});
-                }
-                else
-                {
-                    reject("Failed to properly set file permissions.");
-                }
+                resolve({newFilePath: newFilePath, fileName: fileName});
             }
         }); 
     });
