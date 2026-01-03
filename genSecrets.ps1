@@ -78,10 +78,10 @@ openssl req -x509 -subj "/C=US/ST=NY/L=NYC/O=ftYeet Inc/CN=ftYeet/" -passout "pa
 [System.IO.File]::AppendAllText("Secrets/cryptoCertKeyPwd.txt", $CryptoCertKeyPwd, $utf8NoBom)
 
 # openssl has been really finnicky on Windows when I try to automate anything that's not a X509 cert. So what we're going to do is to just use our Node script to generate the keys
-node CLI/main.js keygen -a rsa -v Secrets/cryptoPrivKey.pem -u Secrets/cryptoPubKey.pem -o CryptoEncKeyPwd -k aes-256-cbc
+node CLI/main.js keygen -a rsa -v Secrets/cryptoPrivKey.pem -u Secrets/cryptoPubKey.pem -o $CryptoEncKeyPwd -k aes-256-cbc
 [System.IO.File]::AppendAllText("Secrets/cryptoEncKeyPwd.txt", $CryptoEncKeyPwd, $utf8NoBom)
 
-node CLI/main.js keygen -a ed25519 -v Secrets/cryptoPrivKeySign.pem -u Secrets/cryptoPubKeySign.pem -o CryptoSignKeyPwd -k aes-256-cbc
+node CLI/main.js keygen -a ed25519 -v Secrets/cryptoPrivKeySign.pem -u Secrets/cryptoPubKeySign.pem -o $CryptoSignKeyPwd -k aes-256-cbc
 [System.IO.File]::AppendAllText("Secrets/cryptoSignKeyPwd.txt", $CryptoSignKeyPwd, $utf8NoBom)
 
 [System.IO.File]::AppendAllText("Secrets/cryptoSymmPwd.txt", $CryptoSymmPwd, $utf8NoBom)

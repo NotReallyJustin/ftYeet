@@ -43,14 +43,12 @@ const symmHmacPwd = readFileSync("/run/secrets/crypto_hmac_password", {encoding:
  * @type {Buffer}
  */
 let cryptoPrivkeySign = readFileSync("/run/secrets/crypto_privkey_sign");
-console.log(cryptoPrivkeySign)
 
 /**
  * Password to decrypt the private key used for digital signatures.
  * @type {String}
  */
 let cryptoPrivSignPwd = readFileSync("/run/secrets/crypto_sign_key_password", {encoding: "utf-8"});
-
 
 /**
  * ⭐ Key object for the private (hopefully ED-25519) key.
@@ -75,7 +73,6 @@ let cryptoPrivkey = readFileSync("/run/secrets/crypto_privkey");
  * @type {String}
  */
 let cryptoPrivPwd = readFileSync("/run/secrets/crypto_enc_key_password", {encoding: "utf-8"});
-console.log(cryptoPrivPwd)
 
 /**
  * ⭐ Key object for the private key used to encrypt data.

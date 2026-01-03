@@ -38,8 +38,8 @@ services:
       - crypto_pubkey_sign    # Verify a signature  
       - crypto_pubkey         # Asymmetric encryption
     ports:
-      - 443:443
-      - 80:80
+      - 443:3001
+      - 80:3000
   db:
     # image: postgres
     build:

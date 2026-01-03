@@ -17,7 +17,8 @@ const __dirname = import.meta.dirname;
 
 // Configs and vars
 const MAX_FILE_SIZE = "10MB";
-const PORT = 443;
+const NON_PRIV_HTTP_PORT = 3000;        // Don't give this app root perms to listen on port 80/443. Have docker forward it.
+const NON_PRIV_HTTPS_PORT = 3001;
 
 // In case of reverse proxies down the line
 // This just trusts the proxy to convert x-forwarded-for and other headers into genuine IP addresses we'll be using
@@ -102,12 +103,12 @@ mainServer.all("*", (request, response) => {
 
 // Listen for HTTP *and* HTTPS
 // To consider when we ship this to AWS or smth: listen on a specific adapter
-httpsServer.listen(PORT, () => {
-    console.log(`✅ Server launched on port ${PORT}.`);
+httpsServer.listen(NON_PRIV_HTTPS_PORT, () => {
+    console.log(`✅ Server launched on port ${NON_PRIV_HTTPS_PORT}.`);
 });
 
-mainServer.listen(80, () => {
-    console.log(`✅ HTTP Server launched on port 80. This is only going to be used for redirection.`);
+mainServer.listen(NON_PRIV_HTTP_PORT, () => {
+    console.log(`✅ HTTP Server launched on port ${NON_PRIV_HTTP_PORT}. This is only going to be used for redirection.`);
 });
 
 // ♻️ Spawn deletion service

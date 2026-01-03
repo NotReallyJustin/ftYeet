@@ -307,6 +307,7 @@ GET: https://api.ftyeet.something/download
 
 ## Miscellaneous
 * Crypto Server might not need all the encryption files (ie. public keys) since it has no use for any of them
+* Compression?
 
 ## UX and Progress Bar
 * Assign Job ID to each entry
