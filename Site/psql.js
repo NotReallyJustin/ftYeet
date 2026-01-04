@@ -91,7 +91,7 @@ async function runQuery(queryText, queryValues, arrayRowMode, noParams)
  * @param {boolean} burnOnRead Whether this file should be burnt when we download it
  * @param {Date} expireTimestamp Timestamp when the file expires (and gets marked for deletion)
  * @param {String} url URL you can access the file from
- * @returns {String} UUID of the logged file. This will be used as the file name.
+ * @returns {Promise<string>} UUID of the logged file. This will be used as the file name.
  * @throws If any of the inputs are invalid
  */
 async function logSymmFile(pwdHash2, burnOnRead, expireTimestamp, url)
@@ -122,12 +122,12 @@ async function logSymmFile(pwdHash2, burnOnRead, expireTimestamp, url)
     // Upload to DB
     try
     {
-        let jsonRet = await runQuery(
+        let respFilesDB = await runQuery(
             "INSERT INTO files(PwdHashHash, BurnOnRead, ExpireTime, Url, CheckSum) VALUES($1, $2, $3, $4, $5) RETURNING UUID",
             [pwdHash2, burnOnRead, expireTimestamp, url, checksum], false
         );
 
-        return jsonRet.UUID;
+        return respFilesDB.rows[0].uuid;
     }
     catch(err)
     {
@@ -141,7 +141,7 @@ async function logSymmFile(pwdHash2, burnOnRead, expireTimestamp, url)
  * @param {boolean} burnOnRead Whether this file should be burnt when we download it
  * @param {Date} expireTimestamp Timestamp when the file expires (and gets marked for deletion)
  * @param {String} url URL you can access the file from
- * @returns {String} UUID of the logged file. This will be used as the file name.
+ * @returns {Promise<string>} UUID of the logged file. This will be used as the file name.
  * @throws If any of the inputs are invalid
  */
 async function logAsymmFile(pubkeyB64, burnOnRead, expireTimestamp, url)
@@ -183,12 +183,12 @@ async function logAsymmFile(pubkeyB64, burnOnRead, expireTimestamp, url)
     // Upload to DB
     try
     {
-        let jsonRet = await runQuery(
+        let respFilesDB = await runQuery(
             "INSERT INTO filesAsymm(PubKeyB64, BurnOnRead, ExpireTime, Url, Challenge, ChallengeTime, CheckSum) VALUES($1, $2, $3, $4, $5, $6, $7) RETURNING UUID",
             [pubkeyB64, burnOnRead, expireTimestamp, url, challenge, challengeExpireTime, checksum], false
         );
 
-        return jsonRet.UUID;
+        return respFilesDB.rows[0].uuid;
     }
     catch(err)
     {
@@ -199,7 +199,7 @@ async function logAsymmFile(pubkeyB64, burnOnRead, expireTimestamp, url)
 /**
  * Retrieves a file at the specified URL
  * @param {String} url URL where the file is stored
- * @returns {Promise<null | {name: String, pwdhashhash: String, burnonread: Boolean, expiretime: Date, url: String, checksum: String}>} A JSON representing all the data about the file requested in the URL. Or null if the URL is invalid.
+ * @returns {Promise<null | {uuid: String, pwdhashhash: String, burnonread: Boolean, expiretime: Date, url: String, checksum: String}>} A JSON representing all the data about the file requested in the URL. Or null if the URL is invalid.
  */
 async function getFile(url)
 {
@@ -234,7 +234,7 @@ async function getFile(url)
     let toReturn = dbOutput.rows[0];
 
     // Check the checksum
-    let hsmMerged = `${toReturn.name} ${toReturn.pwdhashhash} ${toReturn.burnonread} ${toReturn.expiretime} ${toReturn.url}`;
+    let hsmMerged = `${toReturn.pwdhashhash} ${toReturn.burnonread} ${toReturn.expiretime} ${toReturn.url}`;
     
     try
     {
@@ -255,7 +255,7 @@ async function getFile(url)
  * Helper function to fetch the database entry for an asymmetric file download.
  * @param {String} url The URL to fetch
  * @throws If the URL is undefined, or the fileAsymm database entry has been tampered with
- * @returns {{name: String, pubkeyb64: String, burnonread: Boolean, expiretime: Date, url: String, challenge: Buffer, challengetime: Date, checksum: String}} A JSON representing all the data about the file requested in the URL.
+ * @returns {{uuid: String, pubkeyb64: String, burnonread: Boolean, expiretime: Date, url: String, challenge: Buffer, challengetime: Date, checksum: String}} A JSON representing all the data about the file requested in the URL.
  */
 async function _fetchFileAsymm(url)
 {
@@ -288,7 +288,7 @@ async function _fetchFileAsymm(url)
     let toReturn = dbOutput.rows[0];
 
     // Check the checksum
-    let hsmMerged = `${toReturn.name} ${toReturn.pubkeyb64} ${toReturn.burnonread} ${toReturn.expiretime} ${toReturn.url} ${toReturn.challenge} ${toReturn.challengetime}`;
+    let hsmMerged = `${toReturn.pubkeyb64} ${toReturn.burnonread} ${toReturn.expiretime} ${toReturn.url} ${toReturn.challenge} ${toReturn.challengetime}`;
 
     try
     {
@@ -327,7 +327,7 @@ async function updateChallenge(url, challenge)
         returned.challengetime = new Date(Date.now());
 
         // Resign the new entry
-        let hsmMerged = `${returned.name} ${returned.pubkeyb64} ${returned.burnonread} ${returned.expiretime} ${returned.url} ${returned.challenge} ${returned.challengetime}`;
+        let hsmMerged = `${returned.pubkeyb64} ${returned.burnonread} ${returned.expiretime} ${returned.url} ${returned.challenge} ${returned.challengetime}`;
         let checksum = await hsmSign(hsmMerged);
 
         returned.checksum = checksum;
@@ -356,7 +356,7 @@ async function updateChallenge(url, challenge)
  * Also does authentication challenge verification before returning the file.
  * @param {String} url URL to retrieve item at
  * @param {String} signedChallenge Signed challenge (in hex) to prove the user actually has the private key to decrypt the file
- * @returns {Promise<null | {name: String, pubkeyb64: String, burnonread: Boolean, expiretime: Date, url: String, challenge: Buffer, challengetime: Date, checksum: String}>} A JSON representing all the data about the file requested in the URL, or null if the URL is invalid.
+ * @returns {Promise<null | {uuid: String, pubkeyb64: String, burnonread: Boolean, expiretime: Date, url: String, challenge: Buffer, challengetime: Date, checksum: String}>} A JSON representing all the data about the file requested in the URL, or null if the URL is invalid.
  */
 async function getFileAsymm(url, signedChallenge)
 {
@@ -488,8 +488,8 @@ async function deleteExpired()
             [], false, true
         );
 
-        let respFileDBExpired = respFilesDB.rows.map(row => row.name);
-        let respFileDBAsymmExpired = respFilesAsymmDB.rows.map(row => row.name);
+        let respFileDBExpired = respFilesDB.rows.map(row => row.uuid);
+        let respFileDBAsymmExpired = respFilesAsymmDB.rows.map(row => row.uuid);
 
         expiredFilePaths.push(...respFileDBExpired);
         expiredFilePaths.push(...respFileDBAsymmExpired);

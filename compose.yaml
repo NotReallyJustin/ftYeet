@@ -28,7 +28,7 @@ services:
       # FWGROUPNAME: filewrite    # Make sure this matches with build args
       HSMHOST: crypto
       HSMPORT: 6312     # Make sure this matches the expose down below
-      FILE_DIR: "./files/"    # Where the files will be stored serverside
+      FILE_DIR: "/usr/src/app/Site/files"    # Should ideally be an absolute path for security purposes. We can standardize this because we have a standardized Docker container.
     secrets:
       - cert
       - server_privkey

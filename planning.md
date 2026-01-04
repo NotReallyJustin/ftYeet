@@ -306,8 +306,10 @@ GET: https://api.ftyeet.something/download
     * Add Crypto Server  ✅
 
 ## Miscellaneous
-* Crypto Server might not need all the encryption files (ie. public keys) since it has no use for any of them
-* Compression?
+* Crypto Server might not need all the encryption files (ie. public keys) since it has no use for any of them ✅
+* Compression? ✅
+* Potentially, more generic error messages. Leave most of the stuff to the serverside logs
+* Serverside logging
 
 ## UX and Progress Bar
 * Assign Job ID to each entry
@@ -320,6 +322,10 @@ GET: https://api.ftyeet.something/download
         * We kind of intentionally used bcrypt
         * Node.js' crypto module automatically creates worker threads for us when doing all the heavy cryptography
         * Functions like `genAsymmCryptosystem` or parsing cryptosystem isn't memory intensive; it's basically like us accessing array indices in C. Basically, O(1)
+* Assign numbers for each step. Asynchronously ping /status every second or so. Wipe input if needed.
+* A few steps will be managed clientside ngl (especially symmEnc)
+* If we return early after each second, just set the meter to full and instantly finish.
+* If we error out early, just stop.
 
 ## Future Plans
 * Prevent bots from abusing file upload (we only have so much space)

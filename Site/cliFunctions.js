@@ -1,5 +1,5 @@
 import * as https from 'https';
-import { writeFile, chmod, readFileSync, rmSync } from 'fs';
+import { writeFile, readFileSync, rm } from 'fs';
 import { deflate, inflate} from 'node:zlib';
 import * as cryptoUtil from '../Common/crypto_util.js';
 import * as path from 'path';
@@ -70,6 +70,7 @@ const genURL = () => new Promise((resolve, reject) => {
 
         }).on('error', err => {
             reject(`Issue when fetching random word: ${err.message}.`);
+            return;
         });
     }
 
@@ -118,6 +119,7 @@ function uploadSymm(data, expireTime, burnOnRead, pwdHash, url)
             if (err)
             {
                 reject("File failed to compress. Please check to make sure that your file isn't corrupted.");
+                return;
             }
 
             // Encrypt the data again (by converting it to - you guessed it - another file syntax!). In the future, this is gonna get moved
@@ -126,41 +128,33 @@ function uploadSymm(data, expireTime, burnOnRead, pwdHash, url)
                 delete symmEnc.ciphertext;
                 
                 let encryptedData = cryptoUtil.toFileSyntaxSymm(symmEnc, ciphertext, cryptoUtil.secureKeyGen(HMAC_CRYPTOSYS_KEY, 32, symmEnc.hmacSalt), 'Server');
+                
+                // Encrypt and write relevant authentication info to database
+                let pwdHash2 = cryptoUtil.genPwdHash(pwdHash, 32);
+                let expireTimestamp = new Date(Date.now() + expireTime * 1000);
 
-                secureWrite(encryptedData)
-                    .then((pathObjects) => {
-                        // Hash pwds again and then store it
-                        let pwdHash2 = cryptoUtil.genPwdHash(pwdHash, 32);
+                logSymmFile(pwdHash2, burnOnRead, expireTimestamp, url).then(uuid => {
+                    secureWrite(uuid, encryptedData)
+                        .then((filePath) => {
 
-                        // Write to database
-                        let expireTimestamp = new Date(Date.now() + expireTime * 1000);
-
-                        logSymmFile(
-                            pathObjects.fileName, pwdHash2, burnOnRead, expireTimestamp, url
-                        ).then(() => {
-
-                            console.log(`Data written to ${pathObjects.newFilePath}`);
+                            console.log(`Data written to ${filePath}`);
                             resolve();
 
-                        }).catch((err) => {
+                        }).catch(err => {
 
-                            // If writing fails, delete the file
-                            try
-                            {
-                                rmSync(pathObjects, {force: true});
-                            }
-                            catch(err)
-                            {
-                                console.error(`Failed to remove file ${pathObjects} when logging fails: ${err}.`)
-                            }
-                            
-                            console.error(`Error in uploadSymm when running SQL: ${err}`);
-                            reject("Internal Database Error. Ask the owner of ftYeet to check their Docker logs.");
+                            // If things fail, wipe the log from the database.
+                            deleteFileSymm(url).catch(err => {
+                                console.error(`Failed to delete file ${filePath} in uploadSymm: ${err}`);
+                            });
+
+                            console.error(`Error when writing file contents to server: ${err}`);
+                            reject(err);
+
                         });
-                    }).catch(err => {
-                        console.error(`Error in uploadSymm: ${err}`);
-                        reject(err);
-                    });
+                }).catch(err => {
+                    console.error(`Error in uploadSymm when running SQL: ${err}`);
+                    reject(err);
+                });
             }).catch(err => {
                 console.error(`Error in uploadSymm when making HSM request: ${err}`);
                 reject(err);
@@ -194,18 +188,9 @@ function downloadSymm(url, pwdHash)
                     reject(`Invalid password for file.`);
                     return;
                 }
-
-                // If it's burn on read, delete the entry
-                if (dbOutput.burnonread)
-                {
-                    // Initiate deletion
-                    deleteFileSymm(url).catch(err => {
-                        console.error(err);
-                    });
-                }
                 
                 // ⭐ If everything is good, read the file and resolve the output
-                let filePath = path.resolve(process.env.FILE_DIR, dbOutput.name);
+                let filePath = path.resolve(process.env.FILE_DIR, dbOutput.uuid);
                 let fileSyntax;
 
                 try
@@ -216,6 +201,7 @@ function downloadSymm(url, pwdHash)
                 {
                     console.error(`Error in downloadSymm when reading ${filePath}: ${err}`);
                     reject(`Unable to retrieve file from ftyeet. The sender likely sent a malformed file.`);
+                    return;
                 }
 
                 // You usually can't work with file syntax. This resolves it.
@@ -236,6 +222,7 @@ function downloadSymm(url, pwdHash)
                 {
                     console.error(`Error when converting from file syntax: ${err}`);
                     reject(`Unable to retrieve file from ftyeet. ${err}`);
+                    return;
                 }
 
                 // This will still be in file syntax. We ran it twice.
@@ -248,9 +235,26 @@ function downloadSymm(url, pwdHash)
                             if (err)
                             {
                                 reject("File failed to inflate. Make sure your file isn't corrupted.");
+                                return;
                             }
                             else
                             {
+                                // Just before we're done, delete the file if it's burn on read
+                                if (dbOutput.burnonread)
+                                {
+                                    // Initiate deletion
+                                    deleteFileSymm(url).catch(err => {
+                                        console.log(err);
+                                    });
+
+                                    rm(filePath, {force: true}, err => {
+                                        if (err)
+                                        {
+                                            console.error(`Error when deleting file ${filePath} in downloadSymm: ${err}`);
+                                        }  
+                                    });
+                                }
+                                
                                 resolve(data);
                             }
                         });
@@ -258,6 +262,7 @@ function downloadSymm(url, pwdHash)
                     }).catch(err => {
                         console.error(`Error when decrypting file syntax: ${err}`);
                         reject(`Unable to retrieve file from ftyeet. ${err}`);
+                        return;
                     });
 
             }).catch(err => {
@@ -287,6 +292,7 @@ function uploadAymm(data, expireTime, burnOnRead, pubkeyB64, url)
             if (err)
             {
                 reject("File failed to compress. Please check to make sure that your file isn't corrupted.");
+                return;
             }
 
             // Encrypt the data again (by converting it to - you guessed it - another file syntax!).
@@ -299,41 +305,36 @@ function uploadAymm(data, expireTime, burnOnRead, pubkeyB64, url)
                 // same place as the symmetric key right now. They're equally secure, but file syntax symm is just faster.
                 let encryptedData = cryptoUtil.toFileSyntaxSymm(symmEnc, ciphertext, cryptoUtil.secureKeyGen(HMAC_CRYPTOSYS_KEY, 32, symmEnc.hmacSalt), 'Server');
 
-                secureWrite(encryptedData)
-                    .then((pathObjects) => {
-                    
-                        // Before we start, note that we're storing the base64 public key in postgres. The fact that it's base64 makes things A LOT easier for us.
-                        // Also it's a public key. We don't need to protect it.
+                // Write relevant info to the database, and THEN write the file.
+                // Before we start, note that we're storing the base64 public key in postgres. The fact that it's base64 makes things A LOT easier for us.
+                // Also it's a public key. We don't need to protect it.
+                let expireTimestamp = new Date(Date.now() + expireTime * 1000);
 
-                        // Write timestamp to database
-                        let expireTimestamp = new Date(Date.now() + expireTime * 1000);
+                logAsymmFile(pubkeyB64, burnOnRead, expireTimestamp, url).then((uuid) => {
 
-                        logAsymmFile(
-                            pathObjects.fileName, pubkeyB64, burnOnRead, expireTimestamp, url
-                        ).then(() => {    
+                    secureWrite(uuid, encryptedData)
+                        .then((filePath) => {
 
-                            console.log(`Data written to ${pathObjects.newFilePath}`);
+                            console.log(`Data written to ${filePath}`);
                             resolve();
 
-                        }).catch((err) => {
+                        }).catch(err => {
 
-                            // If writing fails, delete the file
-                            try
-                            {
-                                rmSync(pathObjects, {force: true});
-                            }
-                            catch(err)
-                            {
-                                console.error(`Failed to remove file ${pathObjects} when logging fails: ${err}.`)
-                            }
+                            // If things fail, wipe the log from the database.
+                            deleteFileAsymm(url).catch(err => {
+                                console.error(`Failed to delete file ${filePath} in uploadSymm: ${err}`);
+                            });
 
-                            console.error(`Error in uploadAsymm when running SQL: ${err}`);
-                            reject("Internal Database Error. Ask the owner of ftYeet to check their Docker logs.");
+                            console.error(`Error when writing file contents to server: ${err}`);
+                            reject(err);
+
                         });
-                    }).catch(err => {
-                        console.error(`Error in uploadAsymm: ${err}`);
-                        reject(err);
-                    });
+
+                }).catch(err => {
+                    console.error(`Error in uploadAsymm when running SQL: ${err}`);
+                    reject(err);
+                });
+
             }).catch(err => {
                 console.error(`Error in uploadAsymm when making HSM request: ${err}`);
                 reject(err);
@@ -380,18 +381,9 @@ function downloadAsymm(url, signedChallenge)
                     reject(`The URL is either invalid, or it expired.`);
                     return;
                 }
-
-                // If it's burn on read, delete the entry
-                if (dbOutput.burnonread)
-                {
-                    // Initiate deletion
-                    deleteFileAsymm(url).catch(err => {
-                        console.log(err);
-                    });
-                }
                 
                 // ⭐ If everything is good, read the file and resolve the output
-                let filePath = path.resolve(process.env.FILE_DIR, dbOutput.name);
+                let filePath = path.resolve(process.env.FILE_DIR, dbOutput.uuid);
                 let fileSyntax;
 
                 try
@@ -402,6 +394,7 @@ function downloadAsymm(url, signedChallenge)
                 {
                     console.error(`Error in downloadAsymm when reading ${filePath}: ${err}`);
                     reject(`Unable to retrieve file from ftyeet. The sender likely sent a malformed file.`);
+                    return;
                 }
 
                 // You usually can't work with file syntax. This resolves it.
@@ -422,6 +415,7 @@ function downloadAsymm(url, signedChallenge)
                 {
                     console.error(`Error when converting from file syntax: ${err}`);
                     reject(`Unable to retrieve file from ftyeet. ${err}`);
+                    return;
                 }
 
                 // Decrypt HSM to get user's E2EE file
@@ -436,9 +430,25 @@ function downloadAsymm(url, signedChallenge)
                             }
                             else
                             {
+
+                                // Just before we're done, delete the file if it's burn on read
+                                if (dbOutput.burnonread)
+                                {
+                                    // Initiate deletion
+                                    deleteFileAsymm(url).catch(err => {
+                                        console.log(err);
+                                    });
+
+                                    rm(filePath, {force: true}, err => {
+                                        if (err)
+                                        {
+                                            console.error(`Error when deleting file ${filePath} in downloadAsymm: ${err}`);
+                                        }
+                                    });
+                                }
+
                                 resolve(data);
                             }
-
                         });
 
                     }).catch(err => {
@@ -483,28 +493,41 @@ const verifyChallenge = (signedChallenge, challenge, pubkeyB64, challengeTime) =
 }
 
 /**
- * Validates the file name (to prevent fiddling with paths), encrypts the file name if it is, disables execution for everyone, and writes the binary data to a file.
- * The new file name will be a randomly generated 64-byte hex (max file name size)
- * @param {Buffer} data The binary data to write to the file. ⭐ This data will be encrypted again via file syntax. ⭐
- * @returns {Promise<{fileName: string, newFilePath: string}>} Promise resolves with the `[new] encrypted file path` and the `file name` as JSON
+ * Validates a given file name, and writes data to said file.
+ * @param {String} fileName The desired file name.
+ * @param {Buffer} data The binary data to write to the file.
+ * @returns {Promise<string>} Promise resolves with the `[new] file path`.
  */
-function secureWrite(data)
+function secureWrite(fileName, data)
 {
     return new Promise((resolve, reject) => {
 
-        // Generate a random, unique file name that's 64 bytes (AKA 64 hexes)
         let newFilePath;
-        let fileName;
         
-        // TODO: Once we get the database up, don't use the exist function. Just make a db query instead. It's much faster
-        while (newFilePath == undefined || fileUtil.exists(newFilePath))
+        const INVALID_REGEX = /[\s*?"'<>\|&$\(\)\[\]\{\};!#~^\x00\\]/i;
+        if (INVALID_REGEX.test(fileName))
         {
-            fileName = randomBytes(32).toString('hex');
-            newFilePath = path.resolve(process.env.FILE_DIR, fileName);
+            reject("Error in secureWrite: Invalid characters in file name.");
+            return;
         }
 
-        // Normally, you would check the dir you're writing to to prevent path traversal, but we alr mitigated that with the re-encoding + docker container
-        // Also checking dir you're writing to doesn't make any sense because this is going to be in a docker container with its own virtual fs
+        newFilePath = path.resolve(process.env.FILE_DIR, fileName);
+
+        if (fileUtil.exists(newFilePath))
+        {
+            reject("Error in secureWrite: File already exists.");
+            return;
+        }
+
+        if (newFilePath.indexOf(process.env.FILE_DIR) == -1)
+        {
+            reject("Error in secureWrite: Malform/Corrupted file path detected.");
+            return;
+        }
+
+        // There's a lot of protections against writing outside of intended dir. First, you have FILE_DIR environment variable loaded at STARTUP time (when Docker starts)
+        // Then you have seccomp and the absolute path resolution. Then, the file names should only come from SQL's UUID generator.
+        // If that all fails, we validate the file name.
         writeFile(newFilePath, data, (err) => {
             if (err)
             {
@@ -513,7 +536,7 @@ function secureWrite(data)
             }
             else
             {
-                resolve({newFilePath: newFilePath, fileName: fileName});
+                resolve(newFilePath);
             }
         }); 
     });

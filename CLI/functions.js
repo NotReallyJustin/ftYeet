@@ -371,18 +371,15 @@ function uploadAsymm(filePath, signKeyPath, signKeyPwd, encKeyPath, dsaPadding, 
         throw `Error when uploading file: Padding for signing algorithm ${dsaPadding.toUpperCase()} is not supported.`; 
     }
 
-    // EncPadding must be `RSA_PKCS1_OAEP_PADDING` or `RSA_PKCS1_PADDING`
+    // EncPadding must be `RSA_PKCS1_OAEP_PADDING`
+    // RSA_PKCS1_PADDING is no longer supported for private decryption
     if (encPadding.toUpperCase() == 'RSA_PKCS1_OAEP_PADDING')
     {
         encPadding = constants.RSA_PKCS1_OAEP_PADDING;
     }
-    else if (dsaPadding.toUpperCase() == `RSA_PKCS1_PADDING`)
-    {
-        encPadding = constants.RSA_PKCS1_PADDING;
-    }
     else
     {
-        throw `Error when uploading file: Padding for signing algorithm ${dsaPadding.toUpperCase()} is not supported.`; 
+        throw `Error when uploading file: Padding for encryption algorithm ${encPadding.toUpperCase()} is not supported.`; 
     }
 
     // Read keys and generate KeyObjects in case it isn't in .pem
@@ -685,5 +682,7 @@ function downloadAsymm(dirPath, url, verifyKeyPath, decKeyPath, decKeyPwd)
                 console.error(`Error when obtaining auth code and downloading file: ${err}`);
             });
         }
-    }); 
+    }).catch(err => {
+        console.error(err);
+    });
 }

@@ -5,7 +5,7 @@
 -- \c main
 
 CREATE TABLE files (
-    UUID UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    UUID uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     PwdHashHash varchar(512),
     BurnOnRead boolean,
     ExpireTime timestamp,
@@ -16,7 +16,7 @@ CREATE TABLE files (
 );
 
 CREATE TABLE filesAsymm (
-    UUID UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    UUID uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     PubKeyB64 text,
     BurnOnRead boolean,
     ExpireTime timestamp,

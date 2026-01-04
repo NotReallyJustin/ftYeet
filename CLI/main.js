@@ -149,7 +149,7 @@ program
     .requiredOption('-s, --signature-key <path>', 'path of key file used to digitally sign your encrypted file; usually, this is your private key')
     .option('-p, --signature-key-pwd [password]', 'password for your signature key file, if you have one')
     .option('-r, --signature-padding [RSA_PKCS1_PSS_PADDING|RSA_PKCS1_PADDING]', 'padding for digital signature (if RSA)', 'RSA_PKCS1_PSS_PADDING')
-    .option('-c, --encryption-padding [RSA_PKCS1_PSS_PADDING|RSA_PKCS1_OAEP_PADDING]', 'padding for RSA asymmetric encryption; if you choose OAEP Padding,' +
+    .option('-c, --encryption-padding [RSA_PKCS1_OAEP_PADDING]', 'padding for RSA asymmetric encryption; if you choose OAEP Padding,' +
         ' the hash is SHA3-512', 'RSA_PKCS1_OAEP_PADDING')
     .option('-t, --expire-time [seconds]', 'how long the server should hold on to the uploaded file; must be >= 60', forceNum, 60)
     .option('-b, --burn', 'whether to burn the file upon download', false)
