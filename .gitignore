@@ -1,6 +1,5 @@
 */node_modules/
-*/privkey*
-*/pubkey*
+CLI/Keys/*
 */.env
 Site/Keys/*
 Secrets/*
