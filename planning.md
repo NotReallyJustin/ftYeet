@@ -280,15 +280,15 @@ GET: https://api.ftyeet.something/download
     * use --- explicitly instead of -x
 
 ## File System Security - NEW
-* Decided against `setfacl` - this breaks `npm`, and because we use Alpine Linux (which runs on BusyBox), trying to access control via `setfacl` on things like `chmod` will break the entire OS
+* Decided against `setfacl` - this breaks `npm`, and because we use Alpine Linux (which runs on BusyBox), trying to access control via `setfacl` on things like `chmod` will break the entire OS ✅
     * In Alpine, all /bin/ commands like `/bin/chmod` are links to `busybox`
     * `setfacl` doesn't stop the attacker from calling an interpreter like `python` or `node` on a user-uploaded file w/o `x` perms
     * Also `acl` doesn't come in Alpine Linux
-* We can't modify `$chmod` since the attacker could just compile a C program and make the syscall, or just do it in Node.js (since V8 uses C)
-* Instead, we're going to:
+* We can't modify `$chmod` since the attacker could just compile a C program and make the syscall, or just do it in Node.js (since V8 uses C) ✅
+* Instead, we're going to: ✅
     * Implement `umask 022` - this is default on Alpine but we're putting it Dockerfile
         * This means unless someone explicitly `$chmod`s, new files do NOT have `x` perms
-    * Prevent `chmod` syscalls via `seccomp`
+    * Prevent `chmod` syscalls via `seccomp` ✅
         * Put it in docker `compose.yaml`
         * Also do it for `chmod` related syscalls like `fchmod` - probably a list in my CS492 notes
 
@@ -312,17 +312,13 @@ GET: https://api.ftyeet.something/download
 * Serverside logging
 
 ## UX and Progress Bar
-* Assign Job ID to each entry
-* Update queue status in the SQL DB
-    * SQL database read/writes are decently fast when you narrow it down
-    * But if this becomes a huge problem in the future we can use an in-memory data structure or just something like Redis
-* The CLI periodically calls /status with the job ID and gets the status
-    * Use this to display progress bar
-    * You can't really make cryptography go faster, but you could make UX better for the user by telling them the status of their upload/download
-        * We kind of intentionally used bcrypt
-        * Node.js' crypto module automatically creates worker threads for us when doing all the heavy cryptography
-        * Functions like `genAsymmCryptosystem` or parsing cryptosystem isn't memory intensive; it's basically like us accessing array indices in C. Basically, O(1)
-* Assign numbers for each step. Asynchronously ping /status every second or so. Wipe input if needed.
+* ~~Assign Job ID to each entry~~
+* ~~Update queue status in the SQL DB~~
+    * ~~SQL database read/writes are decently fast when you narrow it down~~
+    * ~~But if this becomes a huge problem in the future we can use an in-memory data structure or just something like Redis~~
+* ~~Assign numbers for each step. Asynchronously ping /status every second or so. Wipe input if needed.~~
+* Decided against server polling. `ftyeet 1.0` is for resource-limited servers.  ✅
+    * Continuous polling will introduce way too much overhead since it will all be TCP ✅
 * A few steps will be managed clientside ngl (especially symmEnc)
 * If we return early after each second, just set the meter to full and instantly finish.
 * If we error out early, just stop.
@@ -335,15 +331,10 @@ GET: https://api.ftyeet.something/download
 * 2FA? Lowkey this is probably overkill
 * Buy ftyeet domain. As of now, this DNS is getting resolved locally which is not rly a good thing lmao
 * Maybe symmetric enc's cryptosystem should tell us the encryption alg
-* ~~Instead of buffer.from(), consider V8 serialization~~
-    * Don't do this. We can't guarentee what we're sanitizing will be secure.
-    * Use Buffer.from() instead - it's much more straightforward and natural + we don't need to deal with RCE or smth
+* ~~Instead of buffer.from(), consider V8 serialization~~ ✅
+    * Don't do this. We can't guarentee what we're sanitizing will be secure. ✅
+    * Use Buffer.from() instead - it's much more straightforward and natural + we don't need to deal with RCE or smth ✅
 * Have a server config file instead of hardcoding maybe; but that could also be in Docker compose ngl
 
 ## Next project idea
 * Lowkey I want to write a script that prevents a user like apache from doing ANYTHING other than serving a website
-
-## Plan when I open this next time
-* Documentation
-* `seccomp` more
-* Prevent user from modifying umask (`pam-umask`)

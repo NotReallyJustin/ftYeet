@@ -25,7 +25,7 @@ const forceNum = (userArg, prev) => {
 program
     .version("1.0")
     .name("ftYeet")
-    .description("The end-to-end temporary file transfer system.")
+    .description("The end-to-end encrypted temporary file transfer system.")
 ;
 
 program
@@ -103,21 +103,16 @@ program
     .description("Encrypts a local file, runs an HMAC, and uploads it to a ftYeet server")
     .requiredOption('-p, --password <password>', 'password used to encrypt the file locally; also used for HMACs if -c is empty')
     .requiredOption('-f, --file <path>', 'path of the file to upload')
-    .option('-a, --algorithm [chacha20-poly1305|aes-256-gcm|aes256-cbc]', 'symmetric algorithm for encrypting the file', 'chacha20-poly1305')
+    .option('-a, --algorithm [chacha20-poly1305|aes-256-gcm|aes-256-cbc]', 'symmetric algorithm for encrypting the file', 'chacha20-poly1305')
     .option('-c, --auth-code [password]', 'authentication code used to generate file HMAC; password would be used if this is left empty')
     .option('-t, --expire-time [seconds]', 'how long the server should hold on to the uploaded file; must be >= 60', forceNum, 60)
     .option('-b, --burn', 'whether to burn the file upon download', false)
     .action((options) => {
-        try
-        {
-            functions.uploadSymm(options.file, options.password, options.algorithm, options.authCode != undefined ? options.authCode : options.password, 
-                options.expireTime, options.burn
-            );
-        }
-        catch(err)
-        {
+        functions.uploadSymm(options.file, options.password, options.algorithm, options.authCode != undefined ? options.authCode : options.password, 
+            options.expireTime, options.burn
+        ).catch(err => {
             console.error(err.message || err);
-        }
+        });
     });
 
 program
@@ -126,18 +121,15 @@ program
     .requiredOption('-u, --url <url>', 'ftYeet URL where the resource/file is stored')
     .requiredOption('-d, --directory <directory>', 'where the downloaded files will be stored')
     .requiredOption('-p, --password <password>', 'password used to decrypt the file locally; also used to HMACs if -c is empty')
-    .option('-a, --algorithm [chacha20-poly1305|aes-256-gcm|aes256-cbc]', 'symmetric algorithm for decrypting the file; ' + 
+    .option('-a, --algorithm [chacha20-poly1305|aes-256-gcm|aes-256-cbc]', 'symmetric algorithm for decrypting the file; ' + 
         'decryption may fail if this does not match the one used to encrypt', 'chacha20-poly1305')
     .option('-c, --auth-code [password]', 'authentication code used to verify file HMAC; password would be used if this is left empty')
     .action((options) => {
-        try
-        {
-            functions.downloadSymm(options.directory, options.password, options.algorithm, options.authCode != undefined ? options.authCode : options.password, options.url);
-        }
-        catch(err)
-        {
-            console.error(err.message || err);
-        }
+        functions.downloadSymm(
+            options.directory, options.password, options.algorithm, options.authCode != undefined ? options.authCode : options.password, options.url
+        ).catch(err => {
+                console.error(err.message || err);
+            });
     });
 
 program
@@ -154,15 +146,12 @@ program
     .option('-t, --expire-time [seconds]', 'how long the server should hold on to the uploaded file; must be >= 60', forceNum, 60)
     .option('-b, --burn', 'whether to burn the file upon download', false)
     .action((options) => {
-        try
-        {
-            functions.uploadAsymm(options.file, options.signatureKey, options.signatureKeyPwd, options.encryptionKey, 
-                options.signaturePadding, options.encryptionPadding, options.expireTime, options.burn);
-        }
-        catch(err)
-        {
+        functions.uploadAsymm(
+            options.file, options.signatureKey, options.signatureKeyPwd, options.encryptionKey, 
+            options.signaturePadding, options.encryptionPadding, options.expireTime, options.burn
+        ).catch(err => {
             console.error(err.message || err);
-        }
+        });
     });
 
 program
@@ -174,14 +163,10 @@ program
     .requiredOption('-s, --verify-key <path>', 'path of key file used to verify the signature of your downloaded file; usually, this is the sender\'s public key')
     .option('-o, --decryption-key-pwd [password]', 'password for your decryption key file, if you have one')
     .action((options) => {
-        try
-        {
-            functions.downloadAsymm(options.directory, options.url, options.verifyKey, options.decryptionKey, options.decryptionKeyPwd);
-        }
-        catch(err)
-        {
+        functions.downloadAsymm(options.directory, options.url, options.verifyKey, options.decryptionKey, options.decryptionKeyPwd)
+        .catch(err => {
             console.error(err.message || err);
-        }
+        });
     });
 
 program.parse(process.argv);

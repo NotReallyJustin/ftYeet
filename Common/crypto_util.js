@@ -409,8 +409,8 @@ const secureSign = (hashAlg, data, signKeyObject) => {
     {
         try
         {
-            console.log("We got an internal issue with `Node.js` itself when trying to sign the data. This might be an ED25519 key. Trying workaround...");
-            console.log("Note: ED25519 uses SHA2-512 internally.")
+            // console.log("We got an internal issue with `Node.js` itself when trying to sign the data. This might be an ED25519 key. Trying workaround...");
+            // console.log("Note: ED25519 uses SHA2-512 internally.")
             signature = sign(null, data, signKeyObject);
         }
         catch(err2)
@@ -465,8 +465,8 @@ const secureVerify = (hashAlg, data, verifyKeyObject, signature) => {
     {
         try
         {
-            console.log("We got an internal issue with `Node.js` itself when trying to verify the data. This might be an ED25519 key. Trying workaround...");
-            console.log("Note: ED25519 uses SHA2-512 internally.")
+            // console.log("We got an internal issue with `Node.js` itself when trying to verify the data. This might be an ED25519 key. Trying workaround...");
+            // console.log("Note: ED25519 uses SHA2-512 internally.")
             signatureValid = verify(null, data, verifyKeyObject, signatureBuffer);
         }
         catch(err2)

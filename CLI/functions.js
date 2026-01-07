@@ -9,6 +9,7 @@ import { writeFileSync, readFileSync } from 'node:fs';
 import { constants, publicEncrypt, privateDecrypt } from 'node:crypto';
 import { dirname, basename, resolve } from 'node:path';
 import { Agent } from 'https';
+import { SymmDLBar, SymmULBar, AsymmDLBar, AsymmULBar } from './progressBar.js';
 
 export { keygen, uploadSymm, uploadAsymm, downloadSymm, downloadAsymm }
 
@@ -36,7 +37,6 @@ const IGNORE_SSL_AGENT = new Agent({
 function keygen(pubkeyPath, privkeyPath, encryptAlg, options)
 {
     // First check if you can even write the public keys
-    // TODO: If RSA, make it 4096 
     if (fileUtil.exists(pubkeyPath))
     {
         throw `Error when generating keys: ${pubkeyPath} already contains a file.`;
@@ -121,7 +121,7 @@ function keygen(pubkeyPath, privkeyPath, encryptAlg, options)
  * @param {Number} expireTime How long should the ftYeet server hold on to your file (in seconds). Must be `>= 60`.
  * @param {Boolean} burnOnRead Whether ftYeet should delete the file immediately upon download
  */
-function uploadSymm(filePath, password, encAlg, authCode, expireTime, burnOnRead)
+async function uploadSymm(filePath, password, encAlg, authCode, expireTime, burnOnRead)
 {  
     if (expireTime < 60)
     {
@@ -148,30 +148,49 @@ function uploadSymm(filePath, password, encAlg, authCode, expireTime, burnOnRead
         throw `Error when uploading file: ${encAlg} is not a supported encryption algorithm.`;
     }
     
+    // Create progress bar and start it
+    let progressBar = new SymmULBar();
+    progressBar.start();
+
     // Before we fetch, we're going to encrypt to make things nicer :)
     // Read file contents as buffer
     let plaintext;
     try
     {
-        plaintext = readFileSync(filePath)
+        plaintext = readFileSync(filePath);
     }
     catch(err)
     {
+        progressBar.stop();
         console.error(`Error when uploading file: Failed to read file ${filePath}. ${err};`);
+        return;
     }
     
     // Symmetrically encrypt and HMAC the file path and name (using the file construct structure we came up with)
-    let fileConstruct = cryptoUtil.toFileConstruct(basename(filePath), plaintext);
-    let symmEnc = cryptoUtil.symmetricEncrypt(password, authCode, Buffer.from(fileConstruct, 'utf-8'), encAlg, encAlg == 'aes-256-cbc' ? 16 : 12);
+    let fileSyntax;
+
+    try
+    {
+        progressBar.increment();
+        let fileConstruct = cryptoUtil.toFileConstruct(basename(filePath), plaintext);
+        let symmEnc = cryptoUtil.symmetricEncrypt(password, authCode, Buffer.from(fileConstruct, 'utf-8'), encAlg, encAlg == 'aes-256-cbc' ? 16 : 12);
+        let ciphertext = symmEnc.ciphertext;
+        delete symmEnc.ciphertext;
+
+        // Convert to file syntax
+        progressBar.increment();
+        let hmacCryptosys = cryptoUtil.secureKeyGen(authCode, 32, symmEnc.hmacSalt);
+        fileSyntax = cryptoUtil.toFileSyntaxSymm(symmEnc, ciphertext, hmacCryptosys, 'CLI');
+    }
+    catch(err)
+    {
+        progressBar.stop();
+        console.error(`Error when encrypting file ${filePath}: ${err}`);
+        return;
+    }
     
-    let ciphertext = symmEnc.ciphertext;
-    delete symmEnc.ciphertext;
-
-    // Convert to file syntax
-    let hmacCryptosys = cryptoUtil.secureKeyGen(authCode, 32, symmEnc.hmacSalt);
-    let fileSyntax = cryptoUtil.toFileSyntaxSymm(symmEnc, ciphertext, hmacCryptosys, 'CLI');
-
     // First, fetch a word
+    progressBar.increment();
     fetch(`${HTTPS_TUNNEL}/request`, {
         method: 'GET',
         follow: 1,
@@ -184,6 +203,7 @@ function uploadSymm(filePath, password, encAlg, authCode, expireTime, burnOnRead
                 // Generate SALT to hash password with --> This is the hash of the URL
                 let urlHash = cryptoUtil.genHash(salt, 'sha3-256');
 
+                progressBar.increment();
                 // Send fetch request to website
                 fetch(`${HTTPS_TUNNEL}/upload`, {
                     method: 'POST',
@@ -200,7 +220,10 @@ function uploadSymm(filePath, password, encAlg, authCode, expireTime, burnOnRead
                 }).then((response2) => {
                     if (response2.ok)
                     {
+                        progressBar.increment();
+                        progressBar.stop();
                         console.log("File successfully encrypted and uploaded.");
+
                         response2.text().then(text => {
                             console.log(`Your file can be accessed here with this URL: ${text}. Pass it into the download function.`);
                         });
@@ -208,10 +231,12 @@ function uploadSymm(filePath, password, encAlg, authCode, expireTime, burnOnRead
                     else
                     {
                         response2.text().then(err => {
+                            progressBar.stop();
                             console.error(`Error when uploading file: ${err}`);
                         });
                     }
                 }).catch(err => {
+                    progressBar.stop();
                     console.error(`Error when uploading file: ${err}`);
                 });
             });
@@ -219,10 +244,12 @@ function uploadSymm(filePath, password, encAlg, authCode, expireTime, burnOnRead
         else
         {
             response.text().then(err => {
+                progressBar.stop();
                 console.error(`Error when uploading file: ${err}`);
             });
         }
     }).catch(err => {
+        progressBar.stop();
         console.error(`Error when uploading file: ${err}`);
     });
 }
@@ -235,7 +262,7 @@ function uploadSymm(filePath, password, encAlg, authCode, expireTime, burnOnRead
  * @param {String} authCode Password to generate HMAC key
  * @param {String} url The ftYeet URL where the file is stored
  */
-function downloadSymm(dirPath, password, encAlg, authCode, url)
+async function downloadSymm(dirPath, password, encAlg, authCode, url)
 {
     // Error checks
     if (!fileUtil.exists(dirPath))
@@ -257,6 +284,10 @@ function downloadSymm(dirPath, password, encAlg, authCode, url)
     {
         throw `Error when downloading file: ${encAlg} is not a supported encryption algorithm. It probably isn't the cipher used to encrypt the file you're downloading.`;
     }
+
+    // Create progress bar and start it
+    let progressBar = new SymmDLBar();
+    progressBar.start();
 
     // Process SALT --> This is the hash of the URL
     let urlHash = cryptoUtil.genHash(url, 'sha3-256');
@@ -280,25 +311,37 @@ function downloadSymm(dirPath, password, encAlg, authCode, url)
                 let fileSyntax = Buffer.from(response);
 
                 // Process file syntax
+                progressBar.increment();
                 let restored = cryptoUtil.fromFileSyntaxSymm(undefined, authCode, fileSyntax);
+
+                progressBar.increment();
                 let symmDec = cryptoUtil.symmetricDecrypt(password, authCode, restored.data, encAlg, restored.cryptoSystem);
                 let unFileConstruct = cryptoUtil.fromFileConstruct(symmDec.toString('utf-8'));
                 
                 // Write the file!
                 // Doing it recursively to prevent overwrites
+                progressBar.increment();
                 let filePath = resolve(dirPath, unFileConstruct.fileName);
                 fileUtil.writeFileUnique(filePath, unFileConstruct.fileContent);
                 
+                progressBar.increment();
+                progressBar.stop();
+
                 console.log(`Successfully downloaded file with URL ${url}.`);
+            }).catch(err => {
+                progressBar.stop();
+                console.error(`Error when processing file: ${err}`);
             });
         }
         else
         {
             response.text().then(err => {
+                progressBar.stop();
                 console.error(`Error when downloading file: ${err}`);
             });
         }
     }).catch(err => {
+        progressBar.stop();
         console.error(`Error when downloading file: ${err}`);
     });
 }
@@ -315,7 +358,7 @@ function downloadSymm(dirPath, password, encAlg, authCode, url)
  * @param {Boolean} burnOnRead Whether ftYeet should delete the file immediately upon download
  * @futureParam {String} oaepHash OAEP hashing algorithm to use. Must be in the list of supported hashes. Might toggle it on in the future but for security I might lock them into SHA3-512.
  */
-function uploadAsymm(filePath, signKeyPath, signKeyPwd, encKeyPath, dsaPadding, encPadding, expireTime, burnOnRead)
+async function uploadAsymm(filePath, signKeyPath, signKeyPwd, encKeyPath, dsaPadding, encPadding, expireTime, burnOnRead)
 {
     if (expireTime < 60)
     {
@@ -382,6 +425,10 @@ function uploadAsymm(filePath, signKeyPath, signKeyPwd, encKeyPath, dsaPadding, 
         throw `Error when uploading file: Padding for encryption algorithm ${encPadding.toUpperCase()} is not supported.`; 
     }
 
+    // Create progress bar and start it
+    let progressBar = new AsymmULBar();
+    progressBar.start();
+
     // Read keys and generate KeyObjects in case it isn't in .pem
     // 😠 Warning to future Justin: Do not specify an encoding if you want `fs.readFileSync()` to return a buffer
     // That stuff's for old Node.js (when Buffers didn't exist)
@@ -392,7 +439,8 @@ function uploadAsymm(filePath, signKeyPath, signKeyPwd, encKeyPath, dsaPadding, 
     }
     catch(err)
     {
-        throw `Error when uploading file: ${err}`; 
+        progressBar.stop();
+        throw `Error when reading signing key file: ${err}`; 
     }
 
     let signKeyObject;
@@ -402,9 +450,12 @@ function uploadAsymm(filePath, signKeyPath, signKeyPwd, encKeyPath, dsaPadding, 
     }
     catch(err)
     {
-        throw `Error when uploading file: ${err}`; 
+        progressBar.stop();
+        throw `Error when processing signing key file: ${err}`; 
     }
-
+    
+    // Read the encryption key :D
+    progressBar.increment();
     let encKey;
     try
     {
@@ -412,12 +463,14 @@ function uploadAsymm(filePath, signKeyPath, signKeyPwd, encKeyPath, dsaPadding, 
     }
     catch(err)
     {
+        progressBar.stop();
         throw `Error when uploading file: Failed to read key file ${encKeyPath}. ${err}`; 
     }
 
     let encKeyType = cryptoUtil.pubKeyType(encKey, false);
     if (encKeyType == 'none')
     {
+        progressBar.stop();
         throw `Error when uploading file: ${encKeyPath} is not a public key.`; 
     }
 
@@ -435,6 +488,7 @@ function uploadAsymm(filePath, signKeyPath, signKeyPwd, encKeyPath, dsaPadding, 
     }
     catch(err)
     {
+        progressBar.stop();
         throw `Error when uploading file: ${err}`; 
     }
 
@@ -445,6 +499,7 @@ function uploadAsymm(filePath, signKeyPath, signKeyPwd, encKeyPath, dsaPadding, 
     }
     catch(err)
     {
+        progressBar.stop();
         throw `Error when uploading file: Failed to read file ${filePath}. ${err}`; 
     }
 
@@ -454,19 +509,26 @@ function uploadAsymm(filePath, signKeyPath, signKeyPwd, encKeyPath, dsaPadding, 
     {
         // If they pass in a private key, it's fine too because Node.js specs can derive a public key from a private key so the results stay the same.
         // But hopefully, the end user knows how asymmetric encryption works. Which they should if they're running this CLI command.
-
+        progressBar.increment();
         let fileConstruct = cryptoUtil.toFileConstruct(basename(filePath), Buffer.from(plaintext, 'utf-8'));
         let encrypted = publicEncrypt({key: encKeyObject, oaepHash: 'sha3-512', padding: encPadding}, fileConstruct);
+
+        progressBar.increment();
         let signature = cryptoUtil.secureSign('sha3-512', encrypted, {key: signKeyObject, passphrase: signKeyPwd, padding: dsaPadding});
 
+        progressBar.increment();
         let cryptosystem = cryptoUtil.genAsymmCryptosystem(signature, dsaPadding, encPadding, 'sha3-512');
         fileSyntax = cryptoUtil.toFileSyntaxAsymm(cryptosystem, encrypted, {key: signKeyObject, passphrase: signKeyPwd}, 'CLI');
     }
     catch(err)
     {
+        progressBar.stop();   
+
         throw `Error when uploading file: Failed to encrypt file. ${err}`;
     }
 
+    progressBar.increment();
+    
     // First, fetch a word for URL
     fetch(`${HTTPS_TUNNEL}/request`, {
         method: 'GET',
@@ -478,6 +540,7 @@ function uploadAsymm(filePath, signKeyPath, signKeyPwd, encKeyPath, dsaPadding, 
             response.text().then(url => {
                 
                 // Send fetch request to website
+                progressBar.increment();
                 fetch(`${HTTPS_TUNNEL}/uploadAsymm`, {
                     method: 'POST',
                     headers: {
@@ -493,29 +556,47 @@ function uploadAsymm(filePath, signKeyPath, signKeyPwd, encKeyPath, dsaPadding, 
                 }).then((response2) => {
                     if (response2.ok)
                     {
+                        progressBar.increment();
+                        progressBar.stop();
                         console.log("Asymmetrically encrypted file has successfully been encrypted and uploaded.");
+
                         response2.text().then(text => {
                             console.log(`Your file can be accessed here with this URL: ${text}. Pass it into the download function.`);
+                        }).catch(err => {
+                            console.error(`Error reading response text: ${err}`);
                         });
                     }
                     else
                     {
                         response2.text().then(err => {
+                            progressBar.stop();
                             console.error(err);
+                        }).catch(parseErr => {
+                            progressBar.stop();
+                            console.error(`Error reading error response: ${parseErr}`);
                         });
                     }
                 }).catch(err => {
+                    progressBar.stop();
                     console.error(`Error when uploading file: ${err}`);
                 });
+            }).catch(err => {
+                progressBar.stop();
+                console.error(`Error reading URL response: ${err}`);
             });
         }
         else
         {
             response.text().then(err => {
+                progressBar.stop();
                 console.error(`Error when uploading file: ${err}`);
+            }).catch(parseErr => {
+                progressBar.stop();
+                console.error(`Error reading error response: ${parseErr}`);
             });
         }
     }).catch(err => {
+        progressBar.stop();
         console.error(`Error when uploading file: ${err}`);
     });
 }
@@ -528,9 +609,8 @@ function uploadAsymm(filePath, signKeyPath, signKeyPwd, encKeyPath, dsaPadding, 
  * @param {String} decKeyPath Key file for decrypting file contents
  * @param {String|undefined} decKeyPwd Password fo decrypt `decKeyPath`, if any.
  */
-function downloadAsymm(dirPath, url, verifyKeyPath, decKeyPath, decKeyPwd)
+async function downloadAsymm(dirPath, url, verifyKeyPath, decKeyPath, decKeyPwd)
 {
-
     // Error checks
     if (!fileUtil.exists(dirPath))
     {
@@ -570,6 +650,10 @@ function downloadAsymm(dirPath, url, verifyKeyPath, decKeyPath, decKeyPwd)
     {
         throw `Error when downloading file: Can't read Key file ${verifyKeyPath}.`;
     }
+
+    // Create progress bar and start it
+    let progressBar = new AsymmDLBar();
+    progressBar.start();
         
     // Read keys and generate key objects
     let verifyKey;
@@ -579,6 +663,7 @@ function downloadAsymm(dirPath, url, verifyKeyPath, decKeyPath, decKeyPwd)
     }
     catch(err)
     {
+        progressBar.stop();
         throw `Error when downloading file: Failed to read key file ${verifyKeyPath}. ${err}`; 
     }
 
@@ -589,9 +674,11 @@ function downloadAsymm(dirPath, url, verifyKeyPath, decKeyPath, decKeyPwd)
     }
     catch(err)
     {
+        progressBar.stop();
         throw `Error when downloading file: ${err}`; 
     }
 
+    progressBar.increment();
     let decKey;
     try
     {
@@ -611,8 +698,10 @@ function downloadAsymm(dirPath, url, verifyKeyPath, decKeyPath, decKeyPwd)
     {
         throw `Error when downloading file: ${err}`; 
     }
-
+    
     // First, authenticate
+    progressBar.increment();
+    
     fetch(`${HTTPS_TUNNEL}/getAuth`, {
         method: 'GET',
         headers: {
@@ -630,6 +719,7 @@ function downloadAsymm(dirPath, url, verifyKeyPath, decKeyPath, decKeyPwd)
                 let signedChallenge = cryptoUtil.secureSign('sha3-512', challenge, {key: decKeyObject, passphrase: decKeyPwd, padding: constants.RSA_PKCS1_PSS_PADDING});
 
                 // Now, actually fetch the file
+                progressBar.increment();
                 fetch(`${HTTPS_TUNNEL}/downloadAsymm`, {
                     method: 'GET',
                     headers: {
@@ -647,42 +737,70 @@ function downloadAsymm(dirPath, url, verifyKeyPath, decKeyPath, decKeyPwd)
                             let fileSyntax = Buffer.from(fileSyntaxAB);
 
                             // Fetch file syntax
+                            progressBar.increment();
                             let restored = cryptoUtil.fromFileSyntaxAsymm({key: verifyKeyObject}, fileSyntax);
+
+                            progressBar.increment();
                             let plaintext = privateDecrypt({key: decKeyObject, oaepHash: restored.cryptoSystem.oaepHash, padding: restored.cryptoSystem.encryptPadding, passphrase: decKeyPwd}, restored.data);
                             let unFileConstruct = cryptoUtil.fromFileConstruct(plaintext.toString('utf-8'));
 
                             // Write the file!
                             // Doing it recursively to prevent overwrites
+                            progressBar.increment();
                             let filePath = resolve(dirPath, unFileConstruct.fileName);
 
                             try
                             {
                                 fileUtil.writeFileUnique(filePath, unFileConstruct.fileContent);
+
+                                progressBar.increment();
+                                progressBar.stop();
                                 console.log(`Successfully downloaded file with URL ${url}.`);
                             }
                             catch(err)
                             {
-                                fileUtil.writeFileUnique(`./${unFileConstruct.fileName}`, unFileConstruct.fileContent)
-                                console.error(`Error when downloading file: Failed to write file ${filePath}: ${err}. Attempting to write to current dir.`);
+                                try
+                                {
+                                    fileUtil.writeFileUnique(`./${unFileConstruct.fileName}`, unFileConstruct.fileContent)
+
+                                    progressBar.increment();
+                                    progressBar.stop();
+                                    console.error(`Error when downloading file: Failed to write file ${filePath}: ${err}. Attempting to write to current dir.`);
+                                    console.log(`Successfully downloaded file with URL ${url}.`);
+                                }
+                                catch(err2)
+                                {
+                                    progressBar.stop();
+                                    console.error(`Error when downloading file: ${err2}.`);
+                                }
                             }
+                        }).catch(err => {
+                            progressBar.stop();
+                            console.error(`Error when decrypting file: ${err}.`);
                         });
                     }
                     else
                     {
                         response2.text().then(err => {
+                            progressBar.stop();
                             console.error(`Error when authenticating and downloading file: ${err}`);
-                        });
+                        }).catch(err => {
+                            progressBar.stop();
+                            console.error(`Unexpected error: ${err}`);
+                        })
                     }
                 });
             });
         }
         else
         {
-             response.text().then(err => {
+            response.text().then(err => {
+                progressBar.stop();
                 console.error(`Error when obtaining auth code and downloading file: ${err}`);
             });
         }
     }).catch(err => {
+        progressBar.stop();
         console.error(err);
     });
 }
