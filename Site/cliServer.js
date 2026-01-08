@@ -6,11 +6,11 @@
 */
 
 import * as express from 'express';
-import { pubKeyType, base64ToPubKey } from '../Common/crypto_util.js';
+import { pubKeyType } from '../Common/crypto_util.js';
 import * as cliFunctions from './cliFunctions.js';
 
 // ⚒️ Helper functions and constants
-const MAX_FILE_SIZE = '2mb';
+const MAX_FILE_SIZE = 2 * 1024 * 1024;  // 2MB, add another * 1024 for GB
 
 /**
  * Middleware that checks the content type of incoming requests.
@@ -45,7 +45,6 @@ apiRouter.get("/request", (request, response) => {
 
 // Symmetric upload. Uploaded data must be in binary.
 apiRouter.use("/upload", checkContentType('application/octet-stream'));
-apiRouter.use("/upload", express.raw({limit: MAX_FILE_SIZE, type: 'application/octet-stream'}));
 apiRouter.post("/upload", (request, response) => {
     
     // Variables because I have a feeling that headers are going to be strings
@@ -101,7 +100,13 @@ apiRouter.post("/upload", (request, response) => {
         return response.status(400).send("Error when uploading: You must provide a valid URL. Make sure you're using the CLI and not tampering with stuff on your own.")
     }
 
-    cliFunctions.uploadSymm(request.body, expireTime, burnOnRead, request.headers['pwd-hash'], request.headers['url'])
+    // Can never fully rely on it, but it helps us nip the problem in the bud early.
+    if (request.headers['content-length'] != undefined && parseInt(request.headers['content-length']) > MAX_FILE_SIZE)
+    {
+        return response.status(413).send(`Error when uploading: File too large. The maximum allowed size is ${MAX_FILE_SIZE}.`);
+    }
+
+    cliFunctions.uploadSymm(request.body, expireTime, burnOnRead, request.headers['pwd-hash'], request.headers['url'], MAX_FILE_SIZE)
         .then(() => {
             response.send(request.headers['url']);
         }).catch(err => {

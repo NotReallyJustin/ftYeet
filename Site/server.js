@@ -76,7 +76,6 @@ mainServer.use((request, response, next) => {
 });
 
 // Route the request to the CLI server or the web server depending on the subdomain.
-// TODO: reconsider the *
 mainServer.use(subdomain('*.api', apiRouter));
 mainServer.use(webRouter);
 

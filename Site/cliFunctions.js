@@ -1,13 +1,13 @@
 import * as https from 'https';
 import { writeFile, readFileSync, rm } from 'fs';
-import { deflate, inflate} from 'node:zlib';
+import { deflate, inflate, createDeflateRaw, createInflateRaw} from 'node:zlib';
+import { pipeline } from 'stream';
 import * as cryptoUtil from '../Common/crypto_util.js';
 import * as path from 'path';
 import * as fileUtil from '../Common/file_util.js';
 
 import { getFile, logSymmFile, logAsymmFile, runQuery, updateChallenge, getFileAsymm, deleteFileAsymm, deleteFileSymm } from './psql.js';
 import { randomBytes, constants } from 'crypto';
-import { asymmEnc } from '../Crypto/cryptoFunc.js';
 import { hsmEncrypt, hsmDecrypt } from './hsm.js';
 
 export { genURL, uploadSymm, checkURL, downloadSymm, uploadAymm, generateChallenge, verifyChallenge, downloadAsymm }
@@ -100,6 +100,8 @@ const checkURL = async (url) => {
     }
 }
 
+// ----------------- Handling file operations --------------------------------------------
+
 /**
  * Handles symmetric file upload when the CLI server recieves a request 
  * @param {Buffer} data Request data. This should have the encrypted (1x) file contents
@@ -107,13 +109,20 @@ const checkURL = async (url) => {
  * @param {Boolean} burnOnRead Whether to delete the file upon download
  * @param {String} pwdHash Hash of the password used to encrypt the file (in hex). This is going to be hashed again.
  * @param {String} url The URL you can access the file from
+ * @param {Number} maxFileSize The maximum file size for the upload request, in bytes
  * @throws Promise rejects if anything goes wrong with the symmetric file upload process. If this happens, return a 400 error.
  * @returns {Promise<>} .then() when it's successful
  */
-function uploadSymm(data, expireTime, burnOnRead, pwdHash, url)
+function uploadSymm(data, expireTime, burnOnRead, pwdHash, url, maxFileSize)
 {
     return new Promise((resolve, reject) => {
         
+        pipeline(
+            fileUtil.checkStreamSize(maxFileSize),
+            createDeflateRaw(),
+            // HSMEncrypt
+        )
+
         deflate(data, (err, deflatedData) => {
 
             if (err)

@@ -187,28 +187,40 @@ For hashes, we'll use `sha3-512`. `sha2` is probably secure enough, but I had to
     * To bypass this, we're encoding public keys in `base64` ✅
     * This isn't meant to "encrypt" them or to make them more secure; it's a formatting thing ✅
     * I mean public keys aren't meant to be kept secret regardless. Also if you're still paranoid, this whole thing is running over TLS so 🤷‍♂️ ✅
-* **Upload Asymm**: ✅
+* **Upload Asymm**: ✅ ⚒️
 ```
 POST: https://api.ftyeet.something/uploadAsymm
-    --> fileSyntax in Body
+    --> fileSyntax in Body (STREAM)
     --> expire-time
     --> burn-on-read
     --> public-key (if needed)
         * Server will store public key used to encrypt the file
         * HOWEVER - the server can't spoof anything because there's a digital signature - and the server doesn't have the private key used to sign stuff
-    <-- URL
+    --> JobID PWD
+    <-- JobID
+
+GET: https://api.ftyeet.something/status
+    --> JobID
+    --> Password (not transmitting pwdhash because unlike the file which must be decrypted with the password itself, others knowing this password doesn't do anything)
+    <-- Status, or URL if finished
 ```
 
-* **Upload Symm** ✅
+* **Upload Symm** ✅⚒️
 ```
 POST: https://api.ftyeet.something/upload
-    --> fileSyntax in Body
+    --> fileSyntax in Body (STREAM)
     --> file-name
     --> expire-time
     --> burn-on-read
     --> pwd-hash
     --> URL (proposed URL, see "Request" section)
-    <-- URL confirmed
+    --> JobID PWD               --> This means URL is confirmed!
+    <-- JobID
+
+GET: https://api.ftyeet.something/status
+    --> JobID
+    --> JobID PWD (not transmitting pwdhash because unlike the file which must be decrypted with the password itself, others knowing this password doesn't do anything)
+    <-- Status, or URL if finished
 ```
 
 * **Request** ✅
@@ -219,7 +231,7 @@ GET: https://api.ftyeet.something/request
     <-- Unique word for URL
 ```
 
-* **Download Asymm:**  ✅
+* **Download Asymm:**  ✅⚒️
 * Was going to use JWT, but that was way too overengineered. In addition, that doesn't fit into our stateless design at all since you needed a multi-step protocol just to send the challenge code, authenticate, send back the JWT (but do it such that JWT can only be used once within a limited timeframe), etc.
 * Thought of a genius idea for downloading asymmetrically that's much simpler since we consolidate like 3 of the auth steps into 1
 
@@ -233,21 +245,32 @@ GET: https://api.ftyeet.something/getAuth
 ```
 GET: https://api.ftyeet.something/downloadAsymm
     --> URL
-    --> Signed challenge (signed by private key, this of this as ciphertext)
+    --> Signed challenge (signed by private key, this of this as ciphertext)        --> USE SIGNED CHALLENGE AS 
+    --> JobID PWD
 
     // The server should have the public key in the database
+    <-- (In header) JobID
     <-- If decrypt(signed challenge) == challenge, send back the file
+
+SIMULTANEOUSLY:
+GET: https://api.ftyeet.something/status
+    --> JobID
+    --> JobID PWD
+    <-- Status
 ```
 
 * This is cryptographically sound because even if the attacker has the signature and the challenge, it can't forge the signature
 
-* **Download Symm** ✅
+* **Download Symm** ✅⚒️
 ```
 GET: https://api.ftyeet.something/download
     --> URL
     --> Hash(Hash(password, Hash(URL)), Hash(URL))
         * Server will compare it by hashing Hash(password, Hash(URL))
+    --> JobID PWD
+
     <-- Encrypted file *OR* Error
+    <-- If decrypt(signed challenge) == challenge, send back the file
 ```
 * Even if someone managed to bypass the auth process by exploiting the JWT token somehow, they still have to deal with E2EE
 * Auth was only there to make sure we're not sending the encrypted file itself to people who don't need the encrypted file. 👮‍♂️ Doing our part to delay Quantum Computers
@@ -311,6 +334,11 @@ GET: https://api.ftyeet.something/download
 * Potentially, more generic error messages. Leave most of the stuff to the serverside logs
 * Serverside logging
 
+## Streaming
+* Stream the fetch downloads
+* After it's streamed, closed connection. Just poll the status (it will be in-memory store since Redis is overkill FOR NOW)
+* Delete the status when done
+
 ## UX and Progress Bar
 * Assign Job ID to each entry
 * Update queue status in the SQL DB
@@ -331,10 +359,10 @@ GET: https://api.ftyeet.something/download
 * Prevent bots from abusing file upload (we only have so much space)
 * Stop using self signed certs (certbot for website *if* we can have a domain name --> some self-signed stuff might work temporarily; need to think of how to do it for the FTYeet Protocol)
 * Private key rotation daemon on server
-* 🚨 Lowkey thinking of just flat out not giving users permission to upload a file without a password because c'mon dude at that point why even bother 
-* 2FA? Lowkey this is probably overkill
+* ~~2FA? Lowkey this is probably overkill~~
 * Buy ftyeet domain. As of now, this DNS is getting resolved locally which is not rly a good thing lmao
 * Maybe symmetric enc's cryptosystem should tell us the encryption alg
+    * And if mismatch, refuse to decrypt
 * ~~Instead of buffer.from(), consider V8 serialization~~
     * Don't do this. We can't guarentee what we're sanitizing will be secure.
     * Use Buffer.from() instead - it's much more straightforward and natural + we don't need to deal with RCE or smth
@@ -342,8 +370,3 @@ GET: https://api.ftyeet.something/download
 
 ## Next project idea
 * Lowkey I want to write a script that prevents a user like apache from doing ANYTHING other than serving a website
-
-## Plan when I open this next time
-* Documentation
-* `seccomp` more
-* Prevent user from modifying umask (`pam-umask`)

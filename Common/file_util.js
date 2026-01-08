@@ -13,8 +13,10 @@ import {
 } from 'node:fs';
 
 import { dirname, parse, resolve } from 'node:path';
+import { PassThrough } from 'node:stream'; 
 
-export { isFile, isDir, getFileSize, exists, hasPerms, canRead, canWrite, canExecute, chmod, verifyFileName, chown, writeFileUnique }
+export { isFile, isDir, getFileSize, exists, hasPerms, canRead, canWrite, canExecute, chmod, verifyFileName, chown, writeFileUnique, checkStreamSize }
+
 /**
  * Checks if a file path is actually a file
  * @param {String} path The path to check
@@ -245,3 +247,47 @@ function writeFileUnique(filePath, fileContents, it)
  * @returns {Boolean} Whether or not the file name is valid.
  */
 const verifyFileName = (fileName) => fileName.length <= 30 && !/(\\|\/|\.\.|:|\*|\?|<|>|\||&)/mi.test(fileName);
+
+/**
+ * A PassThrough processing "middleware" stream that errors out if the stream exceeds a certain size.
+ */
+const LimitSizeStream = class LimitSizeStream extends PassThrough {
+
+    /**
+     * Creates a "middleware" stream that errors out if the stream exceeds a certain size.
+     * @param {Number} maxSize Maximum allowed size of the stream, in bytes
+     */
+    constructor(maxSize)
+    {
+        super();
+        this.maxSize = maxSize;
+        this.size = 0;
+    }
+
+    // callback(error, dataToPushOutOfStream)
+    _transform(chunk, _encoding, callback)
+    {
+        this.size += chunk.length;
+        
+        if (this.size > this.maxSize)
+        {
+            let streamError = new Error("Stream size exceeded");
+            streamError.code = 'LIMIT_EXCEEDED';            // Feels like we're going to need this down the line to throw errors back to user
+
+            callback(streamError);
+        }
+        else
+        {
+            callback(null, chunk);
+        }
+    }
+    
+}
+
+/**
+ * Creates a PassThrough stream (think function that processes a *read stream* of data like requests) that limits the Stream Size.
+ * @param {Number} maxSize Maximum allowed size of the streamed file, in bytes
+ * @return {LimitSizeStream} A stream to put into a pipeline.
+ * @throws Errors if the stream exceeds the maximum size.
+ */
+const checkStreamSize = (maxSize) => new LimitSizeStream(maxSize);
