@@ -1,19 +1,18 @@
+# Converts main.js into a standalone executable for Windows.
+# This will only compile it for x64. Maybe if this project gets big enough I'll compile it for other versions.
+# BUT if you're building this yourself, just change the variable below to one of the pkg targets here: https://www.npmjs.com/package/pkg
+
+$TARGET="latest-windows-x64"
+$OUTPUT_PATH="./Executables/ftYeet-windows-x64"
+
 # Automatically bundles all the .js files and turns it into a standalone executable
+npm install
+npx esbuild --bundle --platform=node --format=cjs --target=node23 --outfile=./cli.js ./main.js
 
-npx esbuild --bundle --platform=node --format=cjs --target=node23 --outfile=cli.js ./main.js
-node --experimental-sea-config sea-config.json 
-
-# Bash script written in WSL - `.exe` extension is necessary
-node -e "require('fs').copyFileSync(process.execPath, 'cli.exe')" 
-signtool remove /s cli.exe 
-
-# Inject binary into cli.exe
-npx postject ./cli.exe NODE_SEA_BLOB sea-prep.blob --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2
-signtool sign /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 cli.exe
-
-# Might get an error because it is self signed
-signtool verify /v /pa cli.exe
+# Create the Windows executable for x64
+npx pkg ./cli.js --targets $TARGET --output $OUTPUT_PATH
+signtool sign /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $OUTPUT_PATH
+signtool verify /v /pa $OUTPUT_PATH     # Might get an error because it is self signed
 
 # Cleanup
-rm sea-prep.blob
 rm cli.js
