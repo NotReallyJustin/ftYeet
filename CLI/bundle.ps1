@@ -1,4 +1,3 @@
-#!/bin/sh
 # Automatically bundles all the .js files and turns it into a standalone executable
 
 npx esbuild --bundle --platform=node --format=cjs --target=node23 --outfile=cli.js ./main.js
