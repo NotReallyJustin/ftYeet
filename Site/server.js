@@ -1,10 +1,16 @@
 /*
     Main Server handler for ftYeet
+
+    This script is intended to seperate all the unnecessary configs like ports and connection handling from main routing logic.
+    It also spawns the certain background processes like the deletion service on startup.
+
+    This server uses express routing, so you could easily build on what we have here by creating more routers and subdomains.
+    Maybe someday you could make a website for this
 */
 
 import express from 'express';
 import subdomain from 'express-subdomain'
-import * as path from 'path';
+import { log } from '../Common/logging.js';
 import { createServer } from 'https';
 import { readFileSync } from 'fs';
 import { spawn } from 'child_process';
@@ -16,7 +22,7 @@ const mainServer = express();
 const __dirname = import.meta.dirname;
 
 // Configs and vars
-const MAX_FILE_SIZE = "10MB";
+const MAX_FILE_SIZE = process.env.MAX_FILE_SIZE;  // SECURITY NOTE: This is set at startup. Regardless of how process.env.MAX_FILE_SIZE changes later, this variable will not.
 const NON_PRIV_HTTP_PORT = 3000;        // Don't give this app root perms to listen on port 80/443. Have docker forward it.
 const NON_PRIV_HTTPS_PORT = 3001;
 
@@ -43,20 +49,22 @@ mainServer.use((request, response, next) => {
     }
 });
 
-// // Log incoming requests
-// mainServer.use("*", (request, response, next) => {
-//     console.log("--------------------------------------------------------------------");
-//     console.log(`Connection established with ${request.ip} on port ${request.socket.localPort} via remote port ${request.socket.remotePort}.`);
-//     console.log(`Request Type: ${request.method}`);
-//     console.log(`Request Host: ${request.hostname}`);
-//     console.log(`Request Path: ${request.originalUrl}`)
-//     console.dir(`DEBUG - Request Headers:`)
-//     console.dir(request.headers)
-//     console.log("--------------------------------------------------------------------");
-//     console.log("");
+// Log incoming requests
+mainServer.use("*", (request, response, next) => {
+    let str = "--------------------------------------------------------------------\n";
+    str += `Connection established with ${request.ip} on port ${request.socket.localPort} via remote port ${request.socket.remotePort}.\n`;
+    str += `Request Type: ${request.method}\n`;
+    str += `Request Path: ${request.originalUrl}\n`;
 
-//     next();
-// });
+    // IF WE WANT TO DEBUG, UNCOMMENT THIS
+    // str += "DEBUG - Request Headers:\n";
+    // str += JSON.stringify(request.headers, null, 4) + "\n";
+    // str += "--------------------------------------------------------------------\n";
+
+    log(str, process.env.LOG_BACK == 'true');
+
+    next();
+});
 
 // 404 invalid subdomains
 // This is a whitelist

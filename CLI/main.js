@@ -107,9 +107,10 @@ program
     .option('-c, --auth-code [password]', 'authentication code used to generate file HMAC; password would be used if this is left empty')
     .option('-t, --expire-time [seconds]', 'how long the server should hold on to the uploaded file; must be >= 60', forceNum, 60)
     .option('-b, --burn', 'whether to burn the file upon download', false)
+    .option('-x, --debug-mode', 'enable debug mode for more verbose errors', false)
     .action((options) => {
         functions.uploadSymm(options.file, options.password, options.algorithm, options.authCode != undefined ? options.authCode : options.password, 
-            options.expireTime, options.burn
+            options.expireTime, options.burn, options.debugMode
         ).catch(err => {
             console.error(err.message || err);
         });
@@ -124,9 +125,10 @@ program
     .option('-a, --algorithm [chacha20-poly1305|aes-256-gcm|aes-256-cbc]', 'symmetric algorithm for decrypting the file; ' + 
         'decryption may fail if this does not match the one used to encrypt', 'chacha20-poly1305')
     .option('-c, --auth-code [password]', 'authentication code used to verify file HMAC; password would be used if this is left empty')
+    .option('-x, --debug-mode', 'enable debug mode for more verbose errors', false)
     .action((options) => {
         functions.downloadSymm(
-            options.directory, options.password, options.algorithm, options.authCode != undefined ? options.authCode : options.password, options.url
+            options.directory, options.password, options.algorithm, options.authCode != undefined ? options.authCode : options.password, options.url, options.debugMode
         ).catch(err => {
                 console.error(err.message || err);
             });
@@ -145,10 +147,11 @@ program
         ' the hash is SHA3-512', 'RSA_PKCS1_OAEP_PADDING')
     .option('-t, --expire-time [seconds]', 'how long the server should hold on to the uploaded file; must be >= 60', forceNum, 60)
     .option('-b, --burn', 'whether to burn the file upon download', false)
+    .option('-x, --debug-mode', 'enable debug mode for more verbose errors', false)
     .action((options) => {
         functions.uploadAsymm(
             options.file, options.signatureKey, options.signatureKeyPwd, options.encryptionKey, 
-            options.signaturePadding, options.encryptionPadding, options.expireTime, options.burn
+            options.signaturePadding, options.encryptionPadding, options.expireTime, options.burn, options.debugMode
         ).catch(err => {
             console.error(err.message || err);
         });
@@ -162,8 +165,9 @@ program
     .requiredOption('-e, --decryption-key <path>', 'path of key file used to decrypt your file; usually, this is your private key')
     .requiredOption('-s, --verify-key <path>', 'path of key file used to verify the signature of your downloaded file; usually, this is the sender\'s public key')
     .option('-o, --decryption-key-pwd [password]', 'password for your decryption key file, if you have one')
+    .option('-x, --debug-mode', 'enable debug mode for more verbose errors', false)
     .action((options) => {
-        functions.downloadAsymm(options.directory, options.url, options.verifyKey, options.decryptionKey, options.decryptionKeyPwd)
+        functions.downloadAsymm(options.directory, options.url, options.verifyKey, options.decryptionKey, options.decryptionKeyPwd, options.debugMode)
         .catch(err => {
             console.error(err.message || err);
         });

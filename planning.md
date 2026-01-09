@@ -319,9 +319,9 @@ GET: https://api.ftyeet.something/download
 * ~~Assign numbers for each step. Asynchronously ping /status every second or so. Wipe input if needed.~~
 * Decided against server polling. `ftyeet 1.0` is for resource-limited servers.  ✅
     * Continuous polling will introduce way too much overhead since it will all be TCP ✅
-* A few steps will be managed clientside ngl (especially symmEnc)
-* If we return early after each second, just set the meter to full and instantly finish.
-* If we error out early, just stop.
+* A few steps will be managed clientside ngl (especially symmEnc)✅
+* If we return early after each second, just set the meter to full and instantly finish.✅
+* If we error out early, just stop.✅
 
 ## Future Plans
 * Prevent bots from abusing file upload (we only have so much space)
@@ -335,6 +335,7 @@ GET: https://api.ftyeet.something/download
     * Don't do this. We can't guarentee what we're sanitizing will be secure. ✅
     * Use Buffer.from() instead - it's much more straightforward and natural + we don't need to deal with RCE or smth ✅
 * Have a server config file instead of hardcoding maybe; but that could also be in Docker compose ngl
+* Github actions to generate executables
 
 ## Next project idea
 * Lowkey I want to write a script that prevents a user like apache from doing ANYTHING other than serving a website

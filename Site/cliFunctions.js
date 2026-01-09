@@ -7,8 +7,14 @@ import * as fileUtil from '../Common/file_util.js';
 
 import { getFile, logSymmFile, logAsymmFile, runQuery, updateChallenge, getFileAsymm, deleteFileAsymm, deleteFileSymm } from './psql.js';
 import { randomBytes, constants } from 'crypto';
-import { asymmEnc } from '../Crypto/cryptoFunc.js';
+import { log, error} from '../Common/logging.js';
 import { hsmEncrypt, hsmDecrypt } from './hsm.js';
+
+/**
+ * Configured in docker compose. Whether or not to log info or errors to console as well as to file.
+ * We're doing this to keep reject() errors back to the client as vague as possible.
+ */
+const LOG_BACK = process.env.LOG_BACK == 'true';
 
 export { genURL, uploadSymm, checkURL, downloadSymm, uploadAymm, generateChallenge, verifyChallenge, downloadAsymm }
 
@@ -69,7 +75,8 @@ const genURL = () => new Promise((resolve, reject) => {
             });
 
         }).on('error', err => {
-            reject(`Issue when fetching random word: ${err.message}.`);
+            error(`Issue when fetching random word: ${err.message}.`, LOG_BACK);
+            reject(`Server is unable to fetch and reserve a URL at this time. Please try again later.`);
             return;
         });
     }
@@ -95,6 +102,7 @@ const checkURL = async (url) => {
     }
     catch(err)
     {
+        error(`Error when running SQL to validate URL ${url}: \n${err}`, LOG_BACK);
         console.error(`Error when running SQL to validate URL ${url}: ${err}`);
         throw err;
     }
@@ -118,6 +126,7 @@ function uploadSymm(data, expireTime, burnOnRead, pwdHash, url)
 
             if (err)
             {
+                error(`File failed to compress for URL ${url}:\n${err}`, LOG_BACK);
                 reject("File failed to compress. Please check to make sure that your file isn't corrupted.");
                 return;
             }
@@ -137,28 +146,31 @@ function uploadSymm(data, expireTime, burnOnRead, pwdHash, url)
                     secureWrite(uuid, encryptedData)
                         .then((filePath) => {
 
-                            console.log(`Data written to ${filePath}`);
+                            log(`Data written to ${filePath} for URL ${url}.`, LOG_BACK);
                             resolve();
 
                         }).catch(err => {
 
                             // If things fail, wipe the log from the database.
                             deleteFileSymm(url).catch(err => {
-                                console.error(`Failed to delete file ${filePath} in uploadSymm: ${err}`);
+                                error(`Failed to delete file ${filePath} in uploadSymm: ${err}`, LOG_BACK);
                             });
 
-                            console.error(`Error when writing file contents to server: ${err}`);
-                            reject(err);
+                            error(`Error when writing file contents to server: ${err}`, LOG_BACK);
+                            reject("Unable to write contents of file to the server.");
 
                         });
                 }).catch(err => {
-                    console.error(`Error in uploadSymm when running SQL: ${err}`);
-                    reject(err);
+                    error(`Error in uploadSymm when running SQL for ${url}: \n${err}`, LOG_BACK);
+                    reject("Unable to write metadata of file to database.");
                 });
             }).catch(err => {
-                console.error(`Error in uploadSymm when making HSM request: ${err}`);
-                reject(err);
+                error(`Error in uploadSymm when making HSM request for ${url}: \n${err}`, LOG_BACK);
+                reject("Unable to encrypt file with HSM.");
             });
+        }).catch(err => {
+            error(`Error in uploadSymm when deflating data for ${url}: \n${err}`, LOG_BACK);
+            reject("Unable to compress uploaded file.");
         });
     });
 }
@@ -178,13 +190,15 @@ function downloadSymm(url, pwdHash)
 
                 if (dbOutput == null)
                 {
+                    error(`Warning in downloadSymm: Invalid or expired URL ${url} requested.`, LOG_BACK);
                     reject(`The URL is either invalid, or it expired.`);
                     return;
                 }
 
                 // Validate password hash
-                if (cryptoUtil.verifyPwdHash(pwdHash, dbOutput.pwdhashhash))
+                if (!cryptoUtil.verifyPwdHash(pwdHash, dbOutput.pwdhashhash))
                 {
+                    error(`Error in downloadSymm when verifying password hash: Invalid password for URL ${url}.`, LOG_BACK);
                     reject(`Invalid password for file.`);
                     return;
                 }
@@ -199,8 +213,8 @@ function downloadSymm(url, pwdHash)
                 }
                 catch(err)
                 {
-                    console.error(`Error in downloadSymm when reading ${filePath}: ${err}`);
-                    reject(`Unable to retrieve file from ftyeet. The sender likely sent a malformed file.`);
+                    error(`Error in downloadSymm when reading ${filePath}: \n${err}`, LOG_BACK);
+                    reject(`Unable to retrieve file requested. The sender likely sent a malformed file.`);
                     return;
                 }
 
@@ -220,8 +234,8 @@ function downloadSymm(url, pwdHash)
                 }
                 catch(err)
                 {
-                    console.error(`Error when converting from file syntax: ${err}`);
-                    reject(`Unable to retrieve file from ftyeet. ${err}`);
+                    error(`Error in downloadSymm when converting from file syntax: \n${err}`, LOG_BACK);
+                    reject(`Unable to process file requested. The sender likely sent a malformed file.`);
                     return;
                 }
 
@@ -234,6 +248,7 @@ function downloadSymm(url, pwdHash)
 
                             if (err)
                             {
+                                error(`Error in downloadSymm when inflating file for URL ${url}:\n${err}`, LOG_BACK);
                                 reject("File failed to inflate. Make sure your file isn't corrupted.");
                                 return;
                             }
@@ -244,13 +259,14 @@ function downloadSymm(url, pwdHash)
                                 {
                                     // Initiate deletion
                                     deleteFileSymm(url).catch(err => {
+                                        error(`Error in downloadSymm when removing burned file from database ${filePath}:\n${err}`, LOG_BACK);
                                         console.log(err);
                                     });
 
                                     rm(filePath, {force: true}, err => {
                                         if (err)
                                         {
-                                            console.error(`Error when deleting file ${filePath} in downloadSymm: ${err}`);
+                                            error(`Error in downloadSymm when deleting burned file ${filePath}:\n${err}`, LOG_BACK);
                                         }  
                                     });
                                 }
@@ -260,13 +276,13 @@ function downloadSymm(url, pwdHash)
                         });
 
                     }).catch(err => {
-                        console.error(`Error when decrypting file syntax: ${err}`);
-                        reject(`Unable to retrieve file from ftyeet. ${err}`);
+                        error(`Error in downloadSymm when decrypting a file ${filePath} from file syntax: \n${err}`, LOG_BACK);
+                        reject(`Unable to decode file requested. The sender likely sent a malformed file.`);
                         return;
                     });
 
             }).catch(err => {
-                console.error(`Error in downloadSymm when running SQL: ${err}`);
+                error(`Error in downloadSymm when running SQL for URL ${url}: \n${err}`, LOG_BACK);
                 reject("Internal Database Error. Ask the owner of ftYeet to check their Docker logs.");
             });
     });
@@ -291,6 +307,7 @@ function uploadAymm(data, expireTime, burnOnRead, pubkeyB64, url)
 
             if (err)
             {
+                error(`Error in uploadAsymm when deflating data for ${url}:\n${err}`, LOG_BACK);
                 reject("File failed to compress. Please check to make sure that your file isn't corrupted.");
                 return;
             }
@@ -315,29 +332,29 @@ function uploadAymm(data, expireTime, burnOnRead, pubkeyB64, url)
                     secureWrite(uuid, encryptedData)
                         .then((filePath) => {
 
-                            console.log(`Data written to ${filePath}`);
+                            log(`uploadAsymm: Data written to ${filePath}.`, LOG_BACK);
                             resolve();
 
                         }).catch(err => {
 
                             // If things fail, wipe the log from the database.
                             deleteFileAsymm(url).catch(err => {
-                                console.error(`Failed to delete file ${filePath} in uploadSymm: ${err}`);
+                                error(`Error in uploadAsymm when deleting file ${filePath} after earlier error: \n${err}`, LOG_BACK);
                             });
 
-                            console.error(`Error when writing file contents to server: ${err}`);
-                            reject(err);
+                            error(`Error in uploadAsymm when writing file contents of ${filePath} to disk for URL ${url}: \n${err}`, LOG_BACK);
+                            reject("Unable to write contents of file to the server.");
 
                         });
 
                 }).catch(err => {
-                    console.error(`Error in uploadAsymm when running SQL: ${err}`);
-                    reject(err);
+                    error(`Error in uploadAsymm when running SQL for URL ${url}: \n${err}`, LOG_BACK);
+                    reject("Unable to log the upload request to database.");
                 });
 
             }).catch(err => {
-                console.error(`Error in uploadAsymm when making HSM request: ${err}`);
-                reject(err);
+                error(`Error in uploadAsymm when making HSM request for URL ${url}: \n${err}`, LOG_BACK);
+                reject("Unable to re-encrypt the uploaded file.");
             });
         });
     });
@@ -358,7 +375,8 @@ function generateChallenge(url)
             .then(() => {
                 resolve(challenge);
             }).catch(err => {
-                reject(`Error when generating authentication challenge: ${err}`);
+                error(`Error when generating authentication challenge: \n${err}`, LOG_BACK);
+                reject(`Unable to generate an authentication challenge. Please try again later.`);
             });
     });
 }
@@ -378,6 +396,7 @@ function downloadAsymm(url, signedChallenge)
 
                 if (dbOutput == null)
                 {
+                    error(`Warning in downloadAsymm: Invalid or expired URL ${url} requested.`, LOG_BACK);
                     reject(`The URL is either invalid, or it expired.`);
                     return;
                 }
@@ -392,7 +411,7 @@ function downloadAsymm(url, signedChallenge)
                 }
                 catch(err)
                 {
-                    console.error(`Error in downloadAsymm when reading ${filePath}: ${err}`);
+                    error(`Error in downloadAsymm when reading ${filePath}: \n${err}`, LOG_BACK);
                     reject(`Unable to retrieve file from ftyeet. The sender likely sent a malformed file.`);
                     return;
                 }
@@ -413,8 +432,8 @@ function downloadAsymm(url, signedChallenge)
                 }
                 catch(err)
                 {
-                    console.error(`Error when converting from file syntax: ${err}`);
-                    reject(`Unable to retrieve file from ftyeet. ${err}`);
+                    error(`Error when converting file for ${url} from file syntax: \n${err}`, LOG_BACK);
+                    reject(`Unable to retrieve file from ftyeet. The sender likely sent a malformed file.`);
                     return;
                 }
 
@@ -426,6 +445,7 @@ function downloadAsymm(url, signedChallenge)
 
                             if (err)
                             {
+                                error(`Error in downloadAsymm when inflating file for URL ${url}:\n${err}`, LOG_BACK);
                                 reject("File failed to inflate. Make sure your file isn't corrupted.");
                             }
                             else
@@ -436,13 +456,13 @@ function downloadAsymm(url, signedChallenge)
                                 {
                                     // Initiate deletion
                                     deleteFileAsymm(url).catch(err => {
-                                        console.log(err);
+                                        error(`Error in downloadAsymm when removing burned file for ${url} from database ${filePath}:\n${err}`, LOG_BACK);
                                     });
 
                                     rm(filePath, {force: true}, err => {
                                         if (err)
                                         {
-                                            console.error(`Error when deleting file ${filePath} in downloadAsymm: ${err}`);
+                                            error(`Error when deleting burned file ${filePath} in downloadAsymm: ${err}`, LOG_BACK);
                                         }
                                     });
                                 }
@@ -452,12 +472,12 @@ function downloadAsymm(url, signedChallenge)
                         });
 
                     }).catch(err => {
-                        console.error(`Error when decrypting file syntax: ${err}`);
-                        reject(`Unable to retrieve file from ftyeet. ${err}`);
+                        error(`Error when decrypting file syntax for ${url}: ${err}`, LOG_BACK);
+                        reject(`Unable to retrieve decode file requested.`);
                     });
 
             }).catch(err => {
-                console.error(`Error in downloadAsymm when running SQL: ${err}`);
+                error(`Error in downloadAsymm when running SQL for ${url}: ${err}`, LOG_BACK);
                 reject("Internal Database Error. Ask the owner of ftYeet to check their Docker logs.");
             });
     });
@@ -488,7 +508,8 @@ const verifyChallenge = (signedChallenge, challenge, pubkeyB64, challengeTime) =
     }
     catch(err)
     {
-        throw `Error when verifying challenge: ${err}`;
+        error(`Error when verifying challenge: \n${err}`, LOG_BACK);
+        throw `Failed to authenticate. Challenge verification failed.`;
     }
 }
 
@@ -507,7 +528,8 @@ function secureWrite(fileName, data)
         const INVALID_REGEX = /[\s*?"'<>\|&$\(\)\[\]\{\};!#~^\x00\\]/i;
         if (INVALID_REGEX.test(fileName))
         {
-            reject("Error in secureWrite: Invalid characters in file name.");
+            error(`Error in secureWrite for ${fileName}: Invalid characters in file name ${fileName}.`, LOG_BACK);
+            reject("Invalid characters in file name.");
             return;
         }
 
@@ -515,13 +537,16 @@ function secureWrite(fileName, data)
 
         if (fileUtil.exists(newFilePath))
         {
-            reject("Error in secureWrite: File already exists.");
+            error(`Error in secureWrite for ${fileName}: File already exists at ${newFilePath}.`, LOG_BACK);
+            reject(`File ${fileName} already exists.`);
             return;
         }
-
+        
+        // Sanity check for the path resolve above, which should be fine I'm just being paranoid about Node.js
         if (newFilePath.indexOf(process.env.FILE_DIR) == -1)
         {
-            reject("Error in secureWrite: Malform/Corrupted file path detected.");
+            error(`Error in secureWrite for ${fileName}: Malform/Corrupted file path detected.`, LOG_BACK);
+            reject("Malform/Corrupted file path detected.");
             return;
         }
 
@@ -531,8 +556,8 @@ function secureWrite(fileName, data)
         writeFile(newFilePath, data, (err) => {
             if (err)
             {
-                console.error(`Error in secureWrite: ${err}.`);
-                reject(err);
+                error(`Error in secureWrite for ${fileName}: ${err}.`, LOG_BACK);
+                reject("Failed to write file to disk.");
             }
             else
             {

@@ -24,11 +24,13 @@ services:
       CRYPTOPORT: 5312  # Make sure these env vars match with the crypto service below
       QUERYTIMEOUT: 10000
       CONNECTIONTIMEOUT: 5000
+      MAX_FILE_SIZE: "10MB"     # ⭐ Change this to your liking
       # FWGROUPID: 1010   # Make sure this matches with build args
       # FWGROUPNAME: filewrite    # Make sure this matches with build args
       HSMHOST: crypto
       HSMPORT: 6312     # Make sure this matches the expose down below
       FILE_DIR: "/usr/src/app/Site/files"    # Should ideally be an absolute path for security purposes. We can standardize this because we have a standardized Docker container.
+      LOG_BACK: true    # Whether to print a copy of any error or info logs to stdout/stderr in addition to saving them to the logging file. This is especially useful in Docker.
     secrets:
       - cert
       - server_privkey

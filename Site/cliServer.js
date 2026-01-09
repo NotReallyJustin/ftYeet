@@ -8,9 +8,11 @@
 import * as express from 'express';
 import { pubKeyType, base64ToPubKey } from '../Common/crypto_util.js';
 import * as cliFunctions from './cliFunctions.js';
+import { error } from '../Common/logging.js';
 
 // ⚒️ Helper functions and constants
-const MAX_FILE_SIZE = '2mb';
+// Again, this is set at startup
+const MAX_FILE_SIZE = process.env.MAX_FILE_SIZE;
 
 /**
  * Middleware that checks the content type of incoming requests.
@@ -38,8 +40,7 @@ apiRouter.get("/request", (request, response) => {
         .then(word => {
             return response.send(word);
         }).catch(err => {
-            console.error(err);
-            return response.status(400).send("Error: Unable to request a word for the URL.");
+            return response.status(400).send(err);
         })
 });
 
@@ -55,13 +56,13 @@ apiRouter.post("/upload", (request, response) => {
     // Check headers
     if (request.headers['expire-time'] == undefined)
     {
-        return response.status(400).send("Error when uploading: You must provide an expire-time for the file.");
+        return response.status(400).send("You must provide an expire-time for the file.");
     }
     else
     {
         if (isNaN(request.headers['expire-time']))
         {
-            return response.status(400).send("Error when uploading: expire-time must be a number (in seconds).");
+            return response.status(400).send("expire-time must be a number (in seconds).");
         }
         else
         {
@@ -69,14 +70,14 @@ apiRouter.post("/upload", (request, response) => {
 
             if (expireTime < 60)
             {
-                return response.status(400).send("Error when uploading: expire-time must be greater than or equal to 60 seconds.");
+                return response.status(400).send("expire-time must be greater than or equal to 60 seconds.");
             }
         }
     }
 
     if (request.headers['burn-on-read'] == undefined)
     {
-        return response.status(400).send("Error when uploading: You must denote whether or not this file is burn-on-read.");
+        return response.status(400).send(" You must denote whether or not this file is burn-on-read.");
     }
     else
     {
@@ -86,26 +87,26 @@ apiRouter.post("/upload", (request, response) => {
         }
         else
         {
-            return response.status(400).send("Error when uploading: burn-on-read must be a boolean value.");
+            return response.status(400).send("burn-on-read must be a boolean value.");
         }
     }
 
     if (request.headers['pwd-hash'] == undefined)
     {
-        return response.status(400).send("Error when uploading: You must provide a pwd-hash (password hash). This should be done for you via the CLI.");
+        return response.status(400).send("You must provide a pwd-hash (password hash). This should be done for you via the CLI.");
     }
 
     if (request.headers['url'] == undefined || !cliFunctions.checkURL(request.headers['url']) 
         || request.headers['url'].length < 4 || request.headers['url'].length > 10)
     {
-        return response.status(400).send("Error when uploading: You must provide a valid URL. Make sure you're using the CLI and not tampering with stuff on your own.")
+        return response.status(400).send("You must provide a valid URL. Make sure you're using the CLI and not tampering with stuff on your own.")
     }
 
     cliFunctions.uploadSymm(request.body, expireTime, burnOnRead, request.headers['pwd-hash'], request.headers['url'])
         .then(() => {
             response.send(request.headers['url']);
         }).catch(err => {
-            response.status(404).send(`Error when uploading: ${err}.`);
+            response.status(404).send(err.message || err);
         })
 });
 
@@ -114,12 +115,12 @@ apiRouter.get("/download", (request, response) => {
     if (request.headers['url'] == undefined || !cliFunctions.checkURL(request.headers['url']) 
         || request.headers['url'].length < 4 || request.headers['url'].length > 10)
     {
-        return response.status(400).send("Error when downloading: You must provide a valid URL. Make sure you're using the CLI and not tampering with stuff on your own.")
+        return response.status(400).send("You must provide a valid URL. Make sure you're using the CLI and not tampering with stuff on your own.")
     }
 
     if (request.headers['pwd-hash'] == undefined)
     {
-        return response.status(400).send("Error when uploading: You must provide a pwd-hash (password hash). This should be done for you via the CLI.");
+        return response.status(400).send("You must provide a pwd-hash (password hash). This should be done for you via the CLI.");
     }
 
     cliFunctions.downloadSymm(request.headers['url'], request.headers['pwd-hash'])
@@ -127,7 +128,7 @@ apiRouter.get("/download", (request, response) => {
             // res.setHeader('content-type', 'text/plain');
             response.send(fileSyntaxOutput);
         }).catch(err => {
-            response.status(404).send(`Error when downloading: ${err}.`);
+            response.status(404).send(err.message || err);
         });
 });
 
@@ -142,13 +143,13 @@ apiRouter.post("/uploadAsymm", (request, response) => {
     // Check headers
     if (request.headers['expire-time'] == undefined)
     {
-        return response.status(400).send("Error when uploading: You must provide an expire-time for the file.");
+        return response.status(400).send("You must provide an expire-time for the file.");
     }
     else
     {
         if (isNaN(request.headers['expire-time']))
         {
-            return response.status(400).send("Error when uploading: expire-time must be a number (in seconds).");
+            return response.status(400).send("expire-time must be a number (in seconds).");
         }
         else
         {
@@ -156,14 +157,14 @@ apiRouter.post("/uploadAsymm", (request, response) => {
 
             if (expireTime < 60)
             {
-                return response.status(400).send("Error when uploading: expire-time must be greater than or equal to 60 seconds.");
+                return response.status(400).send("expire-time must be greater than or equal to 60 seconds.");
             }
         }
     }
 
     if (request.headers['burn-on-read'] == undefined)
     {
-        return response.status(400).send("Error when uploading: You must denote whether or not this file is burn-on-read.");
+        return response.status(400).send("You must denote whether or not this file is burn-on-read.");
     }
     else
     {
@@ -173,30 +174,30 @@ apiRouter.post("/uploadAsymm", (request, response) => {
         }
         else
         {
-            return response.status(400).send("Error when uploading: burn-on-read must be a boolean value.");
+            return response.status(400).send("burn-on-read must be a boolean value.");
         }
     }
 
     if (request.headers['public-key'] == undefined)
     {
-        return response.status(400).send("Error when uploading: You must provide a public-key. This should be done for you via the CLI.");
+        return response.status(400).send("You must provide a public-key. This should be done for you via the CLI.");
     }
     else if (pubKeyType(request.headers['public-key'], true) == 'none') // pubkey still in b64 btw
     {
-        return response.status(400).send("Error when uploading: The public-key you provided is invalid. It's probably not a public key.");
+        return response.status(400).send("The public-key you provided is invalid. It's probably not a public key.");
     }
 
     if (request.headers['url'] == undefined || !cliFunctions.checkURL(request.headers['url']) 
         || request.headers['url'].length < 4 || request.headers['url'].length > 10)
     {
-        return response.status(400).send("Error when uploading: You must provide a valid URL. Make sure you're using the CLI and not tampering with stuff on your own.")
+        return response.status(400).send("You must provide a valid URL. Make sure you're using the CLI and not tampering with stuff on your own.")
     }
     
     cliFunctions.uploadAymm(request.body, expireTime, burnOnRead, request.headers['public-key'], request.headers['url'])
         .then(() => {
             response.send(request.headers['url']);
         }).catch(err => {
-            response.status(404).send(`Error when uploading: ${err}.`);
+            response.status(404).send(err.message || err);
         });
 });
 
@@ -206,7 +207,7 @@ apiRouter.get("/getAuth", (request, response) => {
     if (request.headers['url'] == undefined || !cliFunctions.checkURL(request.headers['url']) 
         || request.headers['url'].length < 4 || request.headers['url'].length > 10)
     {
-        return response.status(400).send("Error when downloading and authenticating: You must provide a valid URL. Make sure you're using the CLI and not tampering with stuff on your own.");
+        return response.status(400).send("You must provide a valid URL. Make sure you're using the CLI and not tampering with stuff on your own.");
     }
 
     cliFunctions.generateChallenge(request.headers['url'])
@@ -222,12 +223,12 @@ apiRouter.get("/downloadAsymm", (request, response) => {
     if (request.headers['url'] == undefined || !cliFunctions.checkURL(request.headers['url']) 
         || request.headers['url'].length < 4 || request.headers['url'].length > 10)
     {
-        return response.status(400).send("Error when downloading: You must provide a valid URL. Make sure you're using the CLI and not tampering with stuff on your own.")
+        return response.status(400).send("You must provide a valid URL. Make sure you're using the CLI and not tampering with stuff on your own.");
     }
 
     if (request.headers['signed-challenge'] == undefined)
     {
-        return response.status(400).send("Error when downloading: You must provide a signed-challenge. This should be done for you via the CLI once you request a challenge.");
+        return response.status(400).send("You must provide a signed-challenge. This should be done for you via the CLI once you request a challenge.");
     }
 
     cliFunctions.downloadAsymm(request.headers['url'], request.headers['signed-challenge'])
@@ -235,25 +236,25 @@ apiRouter.get("/downloadAsymm", (request, response) => {
             // res.setHeader('content-type', 'text/plain');
             response.send(fileSyntaxOutput);
         }).catch(err => {
-            response.status(404).send(`Error when downloading: ${err}.`);
+            response.status(404).send(err.message || err);
         });
 });
 
-// // Middleware to handle errors
-// apiRouter.use((err, request, response, next) => {
+// Middleware to handle errors
+apiRouter.use((err, request, response, next) => {
 
-//     // Errors we explicitly threw:
-//     if (err.status === 413)
-//     {
-//         response.status(413).send(`Request body is too large. The maximum allowed size is ${MAX_FILE_SIZE}.`);
+    // Errors we explicitly threw:
+    if (err.status === 413)
+    {
+        response.status(413).send(`Request body is too large. The maximum allowed size is ${MAX_FILE_SIZE}.`);
     
-//     }
-//     else
-//     {
-//         console.log(`Error when handling main server routing: ${err}`);
-//         response.status(500).send("Oops - we ran into an internal server error.");
-//     }
-// });
+    }
+    else
+    {
+        error(`Error when handling main server routing:\n${err}`, process.env.LOG_BACK == 'true');
+        response.status(500).send("Oops - we ran into an internal server error.");
+    }
+});
 
 apiRouter.all("*", (request, response) => {
     response.status(404).send("Not found.");
