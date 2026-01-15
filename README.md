@@ -23,7 +23,7 @@ When you want to transfer files between two computers, servers, or VMs, you usua
     * There's also a sizeable group of users/communities that are highly skeptical of trusting Google/Microsoft with their files (ie. training AI with uploaded content)
 * Online File Upload Sites (such as <a href="https://easyupload.io/">EasyUpload.io</a>)
     * None of the publicly available sites are end-to-end encrypted.
-    * The sites are at sketchy at best. They <a href="https://www.bitsight.com/blog/file-sharing-services-cybercriminal-underground">have been used by Cybercriminals to host malware</a>. The sites could potentially<a href="cyberinsider.com/fbi-beware-of-malware-infested-online-file-converter-tools/">modify and embed malicious code within uploaded files</a>
+    * The sites are at sketchy at best. They <a href="https://www.bitsight.com/blog/file-sharing-services-cybercriminal-underground">have been used by Cybercriminals to host malware</a>. The sites could potentially <a href="cyberinsider.com/fbi-beware-of-malware-infested-online-file-converter-tools/">modify and embed malicious code within uploaded files</a>
     * Also like c'mon. Use your brain. Are you really going to upload a file to https://wormhole.app/?
         * Some of these sites straight up lie to you. No, `wormhole.app` is NOT end-to-end encrypted just because you have a fancy animation. Your file is not encrypted/decrypted clientside.
         * If you're advertising "military grade encryption" (it's probably just AES-ECB) and TLS like `file.io` does, you might be a sketchy site. (On an unrelated note, you could actually `$curl` `file.io` without using TLS/SSL)
