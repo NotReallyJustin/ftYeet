@@ -15,7 +15,6 @@ import { createServer } from 'https';
 import { readFileSync } from 'fs';
 import { spawn } from 'child_process';
 
-import webRouter from './webServer.js';
 import apiRouter from './cliServer.js';
 
 const mainServer = express();
@@ -23,8 +22,8 @@ const __dirname = import.meta.dirname;
 
 // Configs and vars
 const MAX_FILE_SIZE = process.env.MAX_FILE_SIZE;  // SECURITY NOTE: This is set at startup. Regardless of how process.env.MAX_FILE_SIZE changes later, this variable will not.
-const NON_PRIV_HTTP_PORT = 3000;        // Don't give this app root perms to listen on port 80/443. Have docker forward it.
-const NON_PRIV_HTTPS_PORT = 3001;
+const NON_PRIV_HTTP_PORT = 3000;        // Don't give this app root perms to listen on port 80/443. Have docker forward it. This port number doesn't actually affect anything
+const NON_PRIV_HTTPS_PORT = 3001;   
 
 // In case of reverse proxies down the line
 // This just trusts the proxy to convert x-forwarded-for and other headers into genuine IP addresses we'll be using
@@ -86,7 +85,6 @@ mainServer.use((request, response, next) => {
 // Route the request to the CLI server or the web server depending on the subdomain.
 // TODO: reconsider the *
 mainServer.use(subdomain('*.api', apiRouter));
-mainServer.use(webRouter);
 
 // Middleware to handle errors
 mainServer.use((err, request, response, next) => {

@@ -8,11 +8,12 @@
 
 import { resolve } from 'path';
 import { appendFile } from 'fs';
+import { exists } from './file_util.js';
 
 // Declare path of log files
 const __dirname = import.meta.dirname;
 const ALL_LOGS_PATH = resolve(__dirname, "./Logs/all.log");
-const INFO_PATH = resolve(__dirname, "./Logs/info.log");             // To do: traffic info
+const INFO_PATH = resolve(__dirname, "./Logs/info.log");
 const STDERR_PATH = resolve(__dirname, "./Logs/error.log");
 
 /**
@@ -34,11 +35,17 @@ const getTimestamp = () => {
 function log(text, print2Console) {
 
     appendFile(ALL_LOGS_PATH, `${getTimestamp()} -\t${text}\n`, {encoding: "utf-8"}, (err) => {
-        console.error(`🚨 Logging to all logs path with text ${text} failed. Error: ${err}`);
+        if (err)
+        {
+            console.error(`🚨 Logging to all logs path with text "${text}" failed. Error: ${err}`);
+        }
     });
 
     appendFile(INFO_PATH, `${getTimestamp()} -\t${text}\n`, {encoding: "utf-8"}, (err) => {
-        console.error(`🚨 Logging to info path with text ${text} failed. Error: ${err}`);
+        if (err)
+        {
+            console.error(`🚨 Logging to info path with text "${text}" failed. Error: ${err}`);
+        }
     });
 
     if (print2Console)
@@ -55,11 +62,17 @@ function log(text, print2Console) {
 function error(text, print2Console) {
 
     appendFile(ALL_LOGS_PATH, `${getTimestamp()} -\t${text}\n`, {encoding: "utf-8"}, (err) => {
-        console.error(`🚨 Logging to all logs path with text ${text} failed. Error: ${err}`);
+        if (err)
+        {
+            console.error(`🚨 Logging to all logs path with text "${text}" failed. Error: ${err}`);
+        }
     });
 
     appendFile(STDERR_PATH, `${getTimestamp()} -\t${text}\n`, {encoding: "utf-8"}, (err) => {
-        console.error(`🚨 Logging to error path with text ${text} failed. Error: ${err}`);
+        if (err)
+        {
+            console.error(`🚨 Logging to error path with text "${text}" failed. Error: ${err}`);
+        }
     });
 
     if (print2Console)

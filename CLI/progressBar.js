@@ -20,7 +20,7 @@ const ProgressBar = class ProgressBar extends cliProgress.SingleBar {
             // Bar - Download Bar, currStep - Current step number, Description - Current step description
             format: `${isDownload ? 'Download' : 'Upload'} Progress: {bar} | Step {currStep}/${stepsArr.length} | {description}`,
             hideCursor: true,
-            fps: 30,
+            fps: 50,
         }, cliProgress.Presets.shades_classic);
 
         /**
@@ -94,7 +94,6 @@ const ProgressBar = class ProgressBar extends cliProgress.SingleBar {
         }
 
         this.lock = true;
-        console.log();          // Print new line to make stuff look nicer
         super.stop();
     }
 }

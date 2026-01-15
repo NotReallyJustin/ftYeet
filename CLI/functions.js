@@ -8,6 +8,7 @@ import fetch from 'node-fetch';
 import { writeFileSync, readFileSync } from 'node:fs';
 import { constants, publicEncrypt, privateDecrypt } from 'node:crypto';
 import { dirname, basename } from 'node:path';
+import { resolve as pathResolve} from 'node:path';
 import { Agent } from 'https';
 import { SymmDLBar, SymmULBar, AsymmDLBar, AsymmULBar } from './progressBar.js';
 
@@ -384,11 +385,13 @@ function downloadSymm(dirPath, password, encAlg, authCode, url, debugMode)
 
                     try
                     {
-                        let filePath = resolve(dirPath, unFileConstruct.fileName);
+                        progressBar.increment();
+                        let filePath = pathResolve(dirPath, unFileConstruct.fileName);
                         fileUtil.writeFileUnique(filePath, unFileConstruct.fileContent);
 
                         progressBar.increment();
                         progressBar.stop();
+
                         console.log(`Successfully downloaded file with URL ${url}.`);
                         resolve();
                     }
@@ -401,6 +404,7 @@ function downloadSymm(dirPath, password, encAlg, authCode, url, debugMode)
                             // Might accidentally increment too much, but progressBar has a built-in limit, so we are fine.
                             progressBar.increment();
                             progressBar.stop();
+                            
                             console.error(`WARNING: Failed to write file ${filePath}: ${err}. Attempting to write to current dir.`);
                             console.log(`Successfully downloaded file with URL ${url}.`);
                             resolve();
@@ -417,6 +421,7 @@ function downloadSymm(dirPath, password, encAlg, authCode, url, debugMode)
                     }
 
                 }).catch(err => {
+                    progressBar.stop();
                     reject(debugToggle(debugMode,
                         `Error when decrypting and processing downloaded file: \n\n${err}`,
                         `Error: Unable to process downloaded file. Either you have the wrong password and auth code, or the uploaded file is corrupted.`
@@ -707,6 +712,8 @@ function uploadAsymm(filePath, signKeyPath, signKeyPwd, encKeyPath, dsaPadding, 
                                 resolve();
                                 return;
                             }).catch(err => {
+                                progressBar.stop();
+
                                 reject(debugToggle(debugMode,
                                     `Unexpected error when decoding URL: \n\n${err}`,
                                     `Error: Unable to retrieve file URL. For more information, enable debug mode.`
@@ -948,7 +955,7 @@ function downloadAsymm(dirPath, url, verifyKeyPath, decKeyPath, decKeyPwd, debug
                                 // Write the file!
                                 // Doing it recursively to prevent overwrites
                                 progressBar.increment();
-                                let filePath = resolve(dirPath, unFileConstruct.fileName);
+                                let filePath = pathResolve(dirPath, unFileConstruct.fileName);
 
                                 try
                                 {

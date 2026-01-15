@@ -323,6 +323,16 @@ GET: https://api.ftyeet.something/download
 * If we return early after each second, just set the meter to full and instantly finish.✅
 * If we error out early, just stop.✅
 
+## Test before release
+* TESTING!!
+    * Everything proper ✅
+    * keygen from scratch ✅
+    * Wrong password download ✅
+    * Wrong key file upload ✅
+    * Wrong key file download ✅
+    * Encrypted key file proper ✅
+    * Encrypted key file wrong key ✅
+
 ## Future Plans
 * Prevent bots from abusing file upload (we only have so much space)
 * Stop using self signed certs (certbot for website *if* we can have a domain name --> some self-signed stuff might work temporarily; need to think of how to do it for the FTYeet Protocol)

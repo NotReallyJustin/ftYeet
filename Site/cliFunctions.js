@@ -168,9 +168,6 @@ function uploadSymm(data, expireTime, burnOnRead, pwdHash, url)
                 error(`Error in uploadSymm when making HSM request for ${url}: \n${err}`, LOG_BACK);
                 reject("Unable to encrypt file with HSM.");
             });
-        }).catch(err => {
-            error(`Error in uploadSymm when deflating data for ${url}: \n${err}`, LOG_BACK);
-            reject("Unable to compress uploaded file.");
         });
     });
 }
