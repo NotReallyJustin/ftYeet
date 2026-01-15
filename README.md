@@ -40,13 +40,11 @@ There's also some extra security (hardening) features if you're the one deployin
 `ftYeet` (v1.0) is intended for small, self-hosted instances where you're not dealing with 5 concurrent, 500MB uploads at once. <br>
 `ftYeet` (v2.0) is currently in development and is intended to be scalable and support features such as file streaming. <br>
 <br>
-
 TLDR: `ftYeet v1.0` (the version you are currently looking at) is intended for use cases where all that scalability is excessive, way too expensive, and borderline overkill.
 
 ## ftYeet Client
 ### Downloading ftYeet Client
-In the Github `Releases` tab, you can download binary executables for Linux and Windows x86-64 processors. <br>
-<br>
+In the Github `Releases` tab, you can download binary executables for Linux and Windows `x86-64` processors. <br>
 
 Alternatively, you could download everything in `CLI/` and run:`$npm install && node main.js [OPTIONS]` in that directory. <br>
 If you wish to create a standalone binary executable for your own machine, modify the `$TARGET` variable in `CLI/bundle.ps1` or `CLI/bundle.sh` and run the executables.
@@ -71,27 +69,36 @@ Commands:
   help [command]            display help for command
 ```
 
-## Launching and Building ftYeet Server
+By default, `ftYeet` redirects you to `https://api.ftyeet.com`. This is NOT a live site *yet*. This is NOT a real URL on the Internet. If you wish, modify that file and rebuild it. <br>
+If you wish to use `ftyeet.com`, just modify your local host file `C:\Windows\System32\drivers\etc\hosts` and add the IP of the ftYeet server.
 
-# Instructions for Building ftYeet in Development
-## Requirements
-* Most of these should be resolved by `npm` since I specified them in `package.json`
-* Use `Node.js v22.13.0`
+## ftYeet Server
+### Deplying ftYeet Server
+There's 3 steps you need to do to deploy the `ftYeet` server:
+1. Generate Secrets (These are going to be your encryption/signing keys, X509 certs, and passwords)
+2. Set up Configs
+3. Build Docker Containers      --> Everything is nicely bundled for you by Docker
 
-## Setting up Environment
-* Run `$npm install` on directories `Site/` and `CLI/`
-* Use `openssl` to generate a `X509` cert and private key in `Site/Keys/`. Put the password for the private key in `Site/.env` as `PRIVKEY_PWD`
-* If needed for testing purposes, run `$CLI/cli.exe keygen <args>` to create asymmetric keys
+## Generating Secrets
+**The short version:** <br>
+Run `./genSecrets.ps1` or `./genSecrets.sh` to automatically generate the necessary keys. These keys will assume that you *DON'T* know what you're doing and force you to create a password for (and encrypt) all of the private keys in `Secrets/`. Sample usage:
 
-## Setting up Docker
-* Make sure you install docker
-* Download or pull the `postgres` image from Docker Hub
-
-## Setting up Secrets
-Here's a one-liner to self-signed key and cert files. Add `-nodes` at the end to prevent the private key from getting encrypted
-```bash
-openssl req -x509 -newkey rsa:4096 -keyout [privateKeyFilePath] -out [certPath] -sha512 -days 365
+```ps1
+# Add -ExecutionPolicy Bypass if needed
+powershell.exe .\genSecrets.ps1 -PrivKeyPwd "CMC" -DBPwd "TralaleroTralala" -CryptoCertKeyPwd "Scion" -CryptoEncKeyPwd "CharlesChadwick" -CryptoSignKeyPwd "DanteCastello" -CryptoSymmPwd "If_Any_Of_My-DND_Fellas_Are_Lurking_Here_and-Recognize_these_names_Hi!" -CryptoHMACPwd "WeBringTheBoom" -HMACCryptosysKey "LoveIslandSeason7"
 ```
+
+If you're using Linux or WSL, you can run this instead:
+```bash
+ ./genSecrets.sh PrivKeyPwd DBPwd CryptoCertKeyPwd CryptoEncKeyPwd CryptoSignKeyPwd CryptoSymmPwd CryptoHMACPasswd HmacCryptosysKey
+
+# For example:
+bash ./genSecrets.sh CMC TralaleroTralala CharlesChadwick DanteCastello If_Any_Of_My-DND_Fellas_Are_Lurking_Here_and-Recognize_these_names_Hi! WeBringTheBoom LoveIslandSeason7
+```
+
+**Manual Key Generation:** <br>
+Alternatively, you can manually generate the necessary keys. <br />
+
 * Create `Secrets/privKey.pem` and `Secrets/cert.pem`. These are X509 certs and key files for the web server and ftYeet protocol's HTTPS tunnel
     * If there's a password for the private key file, put it in `Secrets/privKeyPwd.txt`
 * Create `Secrets/dbPassword.txt` with the PostgreSQL database password.
@@ -107,22 +114,24 @@ openssl req -x509 -newkey rsa:4096 -keyout [privateKeyFilePath] -out [certPath] 
 * Create `Secrets/cryptoHMACPwd.txt`. This is the password used to generate HMACs in the Crypto "HSM" if that becomes necessary.
 * Create `Secrets/hmacCryptosysKey.txt`. This is the key used to generate serverside HMACs when re-encrypting for the second time
 <br >
-Don't worry, you don't need to remember any of these passwords later down the line. Docker will take care of everything for you.
-<br><br>
 
-Alternatively, if you don't want to manually create all this, run `genSecrets.ps1`. `genSecrets.ps1` will assume that you *DON'T* know what you're doing and force you to create a password for (and encrypt) all of the private keys out there. Sample usage:
-
-```ps1
-# Add -ExecutionPolicy Bypass if needed
-powershell.exe .\genSecrets.ps1 -PrivKeyPwd "CMC" -DBPwd "TralaleroTralala" -CryptoCertKeyPwd "Scion" -CryptoEncKeyPwd "CharlesChadwick" -CryptoSignKeyPwd "DanteCastello" -CryptoSymmPwd "If_Any_Of_My-DND_Fellas_Are_Lurking_Here_and-Recognize_these_names_Hi!" -CryptoHMACPwd "WeBringTheBoom" -HMACCryptosysKey "LoveIslandSeason7"
-```
-
-If you're using Linux or WSL, you can run this instead:
+Here's a helpful one-liner to generate a self-signed X509 key and cert file. Add `-nodes` at the end to prevent the private key from getting encrypted.
 ```bash
-bash ./genSecrets.sh PrivKeyPwd DBPwd CryptoCertKeyPwd CryptoEncKeyPwd CryptoSignKeyPwd CryptoSymmPwd CryptoHMACPasswd HmacCryptosysKey
-
-# For example:
-bash ./genSecrets.sh CMC TralaleroTralala CharlesChadwick DanteCastello If_Any_Of_My-DND_Fellas_Are_Lurking_Here_and-Recognize_these_names_Hi! WeBringTheBoom LoveIslandSeason7
+openssl req -x509 -newkey rsa:4096 -keyout [privateKeyFilePath] -out [certPath] -sha512 -days 365
 ```
 
-If you don't have OpenSSL, install it here: https://www.openssl.org/
+If you don't have OpenSSL already on your device(especially on Windows OS), install it here: https://www.openssl.org/
+
+### Configuring ftYeet Server
+Go to `./compose.yaml`. There, you can modify certain environment variables and secrets ahead of time to configure the `ftYeet` server. Here's a few you might want to poke around with:
+* `MAX_FILE_SIZE` - Maximum file size (uncompressed) an end user is allowed to upload.
+* `FILE_DIR` - Directory the `ftYeet` server will store the files in.
+* `server:ports` - The ports the `ftYeet` server will listen on. By default, this is the HTTP (redirects to HTTPS) and HTTPS ports.
+* `LOG_BACK` - Whether you want to print info and error logs to console in addition to writing to log file.
+
+### Building Docker Containers
+Download or pull the official `postgres` image from <a href="https://hub.docker.com/_/postgres">Docker Hub</a>. <br>
+Once you do that, run:
+```bash
+docker compose up -d --build
+```
