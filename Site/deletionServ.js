@@ -10,12 +10,12 @@ import * as path from "path";
 /**
  * How often we want to delete the expired uploads
  */
-const DELETE_INTERVAL_MIN = 5;
+const DELETE_INTERVAL_MIN = process.env.DELETE_INTERVAL_MIN;
 
 /**
  * How often we want to count the # of the expired uploads
  */
-const DISCOVER_INTERVAL_MIN = 1;
+const DISCOVER_INTERVAL_MIN = process.env.DISCOVER_INTERVAL_MIN;
 
 /**
  * Delete expired uploads.

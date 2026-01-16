@@ -24,6 +24,8 @@ services:
       CRYPTOPORT: 5312  # Make sure these env vars match with the crypto service below
       QUERYTIMEOUT: 10000
       CONNECTIONTIMEOUT: 5000
+      DELETE_INTERVAL_MIN: 5    # ⭐ Change this to your liking. How often the deletion serv should delete expired files
+      DISCOVER_INTERVAL_MIN: 1   # ⭐ Change this to your liking. How often the deletion serv should look for expired files
       MAX_FILE_SIZE: "10MB"     # ⭐ Change this to your liking
       # FWGROUPID: 1010   # Make sure this matches with build args
       # FWGROUPNAME: filewrite    # Make sure this matches with build args

@@ -203,7 +203,6 @@ POST: https://api.ftyeet.something/uploadAsymm
 ```
 POST: https://api.ftyeet.something/upload
     --> fileSyntax in Body
-    --> file-name
     --> expire-time
     --> burn-on-read
     --> pwd-hash
